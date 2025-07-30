@@ -4,10 +4,10 @@ use reqwest::blocking::Client;
 use std::collections::HashMap;
 
 pub struct ShortcutClient {
-    client: Client,
-    api_token: String,
-    base_url: String,
-    debug: bool,
+    pub(crate) client: Client,
+    pub(crate) api_token: String,
+    pub(crate) base_url: String,
+    pub(crate) debug: bool,
 }
 
 impl ShortcutClient {

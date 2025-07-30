@@ -9,6 +9,9 @@ use ratatui::{
 };
 use std::collections::HashMap;
 
+#[cfg(test)]
+mod tests;
+
 pub struct App {
     pub stories: Vec<Story>,
     pub list_state: ListState,

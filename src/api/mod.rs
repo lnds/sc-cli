@@ -4,6 +4,9 @@ use std::collections::HashMap;
 
 pub mod client;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Story {
     pub id: i64,

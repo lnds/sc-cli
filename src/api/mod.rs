@@ -1,0 +1,62 @@
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+pub mod client;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Story {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub workflow_state_id: i64,
+    pub app_url: String,
+    #[serde(default)]
+    pub story_type: String,
+    #[serde(default)]
+    pub labels: Vec<Label>,
+    #[serde(default)]
+    pub owner_ids: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Label {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Workflow {
+    pub id: i64,
+    pub name: String,
+    pub states: Vec<WorkflowState>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowState {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResponse {
+    pub stories: StoriesData,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoriesData {
+    pub data: Vec<Story>,
+}
+
+pub trait ShortcutApi {
+    fn search_stories(&self, query: &str) -> Result<Vec<Story>>;
+    fn get_workflows(&self) -> Result<Vec<Workflow>>;
+    fn get_workflow_state_map(&self) -> Result<HashMap<i64, String>>;
+}

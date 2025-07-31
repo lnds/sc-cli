@@ -44,15 +44,10 @@ impl App {
             }
         }
         
-        // Get ordered list of workflow states that have stories, sorted by position
-        let mut workflow_states: Vec<(i64, String)> = stories_by_state
-            .keys()
-            .map(|&id| {
-                let name = workflow_state_map.get(&id)
-                    .cloned()
-                    .unwrap_or_else(|| "Unknown".to_string());
-                (id, name)
-            })
+        // Get ordered list of ALL workflow states, sorted by position
+        let mut workflow_states: Vec<(i64, String)> = workflow_state_map
+            .iter()
+            .map(|(&id, name)| (id, name.clone()))
             .collect();
         
         // Sort by position attribute

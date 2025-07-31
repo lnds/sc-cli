@@ -95,7 +95,8 @@ mod tests {
         let workflows = create_test_workflows();
         let app = App::new(stories, workflows);
 
-        assert_eq!(app.workflow_states.len(), 0);
+        // Should show all workflow states even with no stories
+        assert_eq!(app.workflow_states.len(), 3);
         assert_eq!(app.stories_by_state.len(), 0);
     }
 
@@ -163,11 +164,18 @@ mod tests {
         assert_eq!(app.selected_column, 0);
         assert_eq!(app.selected_row, 0);
         
+        // With empty stories but 3 workflow states, column navigation should work
         app.next_column();
-        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_column, 1);
+        
+        app.next_column();
+        assert_eq!(app.selected_column, 2);
+        
+        app.next_column();
+        assert_eq!(app.selected_column, 0); // Wrap around
         
         app.previous_column();
-        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_column, 2); // Wrap around
     }
 
     #[test]

@@ -6,7 +6,7 @@ fn test_cli_without_args() {
     let mut cmd = Command::cargo_bin("sc-tui").unwrap();
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("required"));
+        .stderr(predicate::str::contains("Either --token or --workspace must be provided"));
 }
 
 #[test]
@@ -17,6 +17,7 @@ fn test_cli_help() {
         .success()
         .stdout(predicate::str::contains("TUI client for Shortcut stories"))
         .stdout(predicate::str::contains("--token"))
+        .stdout(predicate::str::contains("--workspace"))
         .stdout(predicate::str::contains("--limit"))
         .stdout(predicate::str::contains("--debug"));
 }
@@ -36,7 +37,7 @@ fn test_cli_missing_token() {
     cmd.arg("testuser")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("--token"));
+        .stderr(predicate::str::contains("Either --token or --workspace must be provided"));
 }
 
 #[test]

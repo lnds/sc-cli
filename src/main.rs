@@ -1,9 +1,11 @@
 mod api;
+mod config;
 mod ui;
 
 use anyhow::{Context, Result};
 use api::{client::ShortcutClient, ShortcutApi};
 use clap::Parser;
+use config::Config;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
@@ -16,12 +18,16 @@ use ui::App;
 #[derive(Parser, Debug)]
 #[command(author, version, about = "TUI client for Shortcut stories", long_about = None)]
 struct Args {
-    /// Shortcut username or email to search for
-    username: String,
+    /// Shortcut mention name to search for (optional if using workspace)
+    username: Option<String>,
 
-    /// Shortcut API token
+    /// Shortcut API token (optional if using workspace)
     #[arg(short, long)]
-    token: String,
+    token: Option<String>,
+
+    /// Workspace name from config file
+    #[arg(short, long)]
+    workspace: Option<String>,
 
     /// Maximum number of stories to display
     #[arg(short, long, default_value_t = 25)]
@@ -43,8 +49,25 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
+    // Get token and username from args or config
+    let (token, username) = if let Some(workspace_name) = args.workspace {
+        // Load config and get workspace settings, creating if necessary
+        let (config, _created) = Config::load_or_create(&workspace_name)
+            .context("Failed to load or create config")?;
+        let workspace = config.get_workspace(&workspace_name)
+            .context(format!("Failed to get workspace '{}'", workspace_name))?;
+        (workspace.api_key.clone(), workspace.user_id.clone())
+    } else {
+        // Use command line arguments
+        let token = args.token
+            .ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?;
+        let username = args.username
+            .ok_or_else(|| anyhow::anyhow!("Either username or --workspace must be provided"))?;
+        (token, username)
+    };
+
     // Initialize API client
-    let client = ShortcutClient::new(args.token, args.debug)
+    let client = ShortcutClient::new(token, args.debug)
         .context("Failed to create Shortcut client")?;
 
     // Get workflows
@@ -59,7 +82,7 @@ fn main() -> Result<()> {
     let query = if let Some(search) = args.search {
         search
     } else {
-        let mut query_parts = vec![format!("owner:{}", args.username)];
+        let mut query_parts = vec![format!("owner:{}", username)];
         
         if let Some(story_type) = args.story_type {
             query_parts.push(format!("type:{story_type}"));

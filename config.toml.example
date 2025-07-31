@@ -1,0 +1,24 @@
+# SC-TUI Configuration File
+# 
+# Copy this file to config.toml and update with your workspace settings
+# The config file can be placed in:
+# - Current directory: ./config.toml
+# - Home config directory: ~/.config/sc-tui/config.toml
+
+# List all workspace names
+workspaces = ["personal", "work", "client"]
+
+# Configuration for 'personal' workspace
+[personal]
+api_key = "your-personal-api-key"
+user_id = "your.mention.name"
+
+# Configuration for 'work' workspace  
+[work]
+api_key = "your-work-api-key"
+user_id = "your.work.mention.name"
+
+# Configuration for 'client' workspace
+[client]
+api_key = "your-client-api-key"
+user_id = "your.client.mention.name"

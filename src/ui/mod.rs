@@ -1,10 +1,10 @@
-use crate::api::Story;
+use crate::api::{Story, Workflow};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 use std::collections::HashMap;
@@ -13,69 +13,131 @@ use std::collections::HashMap;
 mod tests;
 
 pub struct App {
-    pub stories: Vec<Story>,
-    pub list_state: ListState,
     pub show_detail: bool,
     pub workflow_state_map: HashMap<i64, String>,
     pub should_quit: bool,
+    pub selected_column: usize,
+    pub selected_row: usize,
+    pub stories_by_state: HashMap<i64, Vec<Story>>,
+    pub workflow_states: Vec<(i64, String)>,
 }
 
 impl App {
-    pub fn new(stories: Vec<Story>, workflow_state_map: HashMap<i64, String>) -> Self {
-        let mut list_state = ListState::default();
-        if !stories.is_empty() {
-            list_state.select(Some(0));
+    pub fn new(stories: Vec<Story>, workflows: Vec<Workflow>) -> Self {
+        // Group stories by workflow state
+        let mut stories_by_state: HashMap<i64, Vec<Story>> = HashMap::new();
+        for story in stories.iter() {
+            stories_by_state
+                .entry(story.workflow_state_id)
+                .or_default()
+                .push(story.clone());
         }
+        
+        // Create workflow state map for quick lookups
+        let mut workflow_state_map = HashMap::new();
+        let mut state_positions: HashMap<i64, i64> = HashMap::new();
+        
+        for workflow in workflows.iter() {
+            for state in workflow.states.iter() {
+                workflow_state_map.insert(state.id, state.name.clone());
+                state_positions.insert(state.id, state.position);
+            }
+        }
+        
+        // Get ordered list of workflow states that have stories, sorted by position
+        let mut workflow_states: Vec<(i64, String)> = stories_by_state
+            .keys()
+            .map(|&id| {
+                let name = workflow_state_map.get(&id)
+                    .cloned()
+                    .unwrap_or_else(|| "Unknown".to_string());
+                (id, name)
+            })
+            .collect();
+        
+        // Sort by position attribute
+        workflow_states.sort_by_key(|(id, _)| {
+            state_positions.get(id).copied().unwrap_or(i64::MAX)
+        });
 
         Self {
-            stories,
-            list_state,
             show_detail: false,
             workflow_state_map,
             should_quit: false,
+            selected_column: 0,
+            selected_row: 0,
+            stories_by_state,
+            workflow_states,
         }
     }
 
     pub fn next(&mut self) {
-        if self.stories.is_empty() {
+        if self.workflow_states.is_empty() {
             return;
         }
-
-        let i = match self.list_state.selected() {
-            Some(i) => {
-                if i >= self.stories.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
+        
+        let state_id = self.workflow_states[self.selected_column].0;
+        if let Some(stories) = self.stories_by_state.get(&state_id) {
+            if !stories.is_empty() {
+                self.selected_row = (self.selected_row + 1) % stories.len();
             }
-            None => 0,
-        };
-        self.list_state.select(Some(i));
+        }
     }
 
     pub fn previous(&mut self) {
-        if self.stories.is_empty() {
+        if self.workflow_states.is_empty() {
             return;
         }
-
-        let i = match self.list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.stories.len() - 1
+        
+        let state_id = self.workflow_states[self.selected_column].0;
+        if let Some(stories) = self.stories_by_state.get(&state_id) {
+            if !stories.is_empty() {
+                if self.selected_row == 0 {
+                    self.selected_row = stories.len() - 1;
                 } else {
-                    i - 1
+                    self.selected_row -= 1;
                 }
             }
-            None => 0,
-        };
-        self.list_state.select(Some(i));
+        }
+    }
+    
+    pub fn next_column(&mut self) {
+        if !self.workflow_states.is_empty() {
+            self.selected_column = (self.selected_column + 1) % self.workflow_states.len();
+            self.selected_row = 0;
+        }
+    }
+    
+    pub fn previous_column(&mut self) {
+        if !self.workflow_states.is_empty() {
+            if self.selected_column == 0 {
+                self.selected_column = self.workflow_states.len() - 1;
+            } else {
+                self.selected_column -= 1;
+            }
+            self.selected_row = 0;
+        }
     }
 
     pub fn toggle_detail(&mut self) {
-        if !self.stories.is_empty() {
-            self.show_detail = !self.show_detail;
+        if !self.workflow_states.is_empty() {
+            let state_id = self.workflow_states[self.selected_column].0;
+            if let Some(stories) = self.stories_by_state.get(&state_id) {
+                if !stories.is_empty() {
+                    self.show_detail = !self.show_detail;
+                }
+            }
         }
+    }
+    
+    pub fn get_selected_story(&self) -> Option<&Story> {
+        if self.workflow_states.is_empty() {
+            return None;
+        }
+        
+        let state_id = self.workflow_states[self.selected_column].0;
+        self.stories_by_state.get(&state_id)
+            .and_then(|stories| stories.get(self.selected_row))
     }
 
     pub fn handle_events(&mut self) -> anyhow::Result<()> {
@@ -86,6 +148,8 @@ impl App {
                         KeyCode::Char('q') => self.should_quit = true,
                         KeyCode::Char('j') | KeyCode::Down => self.next(),
                         KeyCode::Char('k') | KeyCode::Up => self.previous(),
+                        KeyCode::Char('l') | KeyCode::Right => self.next_column(),
+                        KeyCode::Char('h') | KeyCode::Left => self.previous_column(),
                         KeyCode::Enter => self.toggle_detail(),
                         KeyCode::Esc if self.show_detail => self.show_detail = false,
                         _ => {}
@@ -114,33 +178,73 @@ pub fn draw(frame: &mut Frame, app: &App) {
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(header, chunks[0]);
 
-    // Story list
-    let stories: Vec<ListItem> = app
-        .stories
-        .iter()
-        .map(|story| {
-            let content = format!("[#{}] {}", story.id, story.name);
-            ListItem::new(content)
-                .style(Style::default().fg(Color::White))
-        })
-        .collect();
-
-    let stories_list = List::new(stories)
-        .block(Block::default().borders(Borders::ALL).title("Stories"))
-        .highlight_style(
-            Style::default()
-                .bg(Color::DarkGray)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
-
-    frame.render_stateful_widget(stories_list, chunks[1], &mut app.list_state.clone());
+    // Create columns for workflow states
+    if !app.workflow_states.is_empty() {
+        let num_columns = app.workflow_states.len();
+        let column_constraints: Vec<Constraint> = (0..num_columns)
+            .map(|_| Constraint::Percentage((100 / num_columns) as u16))
+            .collect();
+        
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(column_constraints)
+            .split(chunks[1]);
+        
+        // Render each workflow state column
+        for (idx, (state_id, state_name)) in app.workflow_states.iter().enumerate() {
+            let is_selected_column = idx == app.selected_column;
+            
+            // Get stories for this state
+            let stories = app.stories_by_state.get(state_id)
+                .map(|s| s.as_slice())
+                .unwrap_or(&[]);
+            
+            // Create list items
+            let items: Vec<ListItem> = stories.iter().enumerate()
+                .map(|(story_idx, story)| {
+                    let content = format!("[#{}] {}", story.id, story.name);
+                    let style = if is_selected_column && story_idx == app.selected_row {
+                        Style::default()
+                            .bg(Color::DarkGray)
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+                    ListItem::new(content).style(style)
+                })
+                .collect();
+            
+            // Column title style
+            let title_style = if is_selected_column {
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            
+            let title = format!(" {} ({}) ", state_name, stories.len());
+            
+            let list = List::new(items)
+                .block(Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .title_style(title_style));
+            
+            frame.render_widget(list, columns[idx]);
+        }
+    } else {
+        // No stories
+        let empty = Paragraph::new("No stories found")
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL));
+        frame.render_widget(empty, chunks[1]);
+    }
 
     // Footer
     let footer_text = if app.show_detail {
         "Press [Esc] to close detail | [q] to quit"
     } else {
-        "Press [↑/k] [↓/j] to navigate | [Enter] for details | [q] to quit"
+        "[←/h] [→/l] switch columns | [↑/k] [↓/j] navigate | [Enter] details | [q] quit"
     };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(Color::DarkGray))
@@ -150,10 +254,8 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     // Detail popup
     if app.show_detail {
-        if let Some(selected) = app.list_state.selected() {
-            if let Some(story) = app.stories.get(selected) {
-                draw_detail_popup(frame, story, &app.workflow_state_map);
-            }
+        if let Some(story) = app.get_selected_story() {
+            draw_detail_popup(frame, story, &app.workflow_state_map);
         }
     }
 }

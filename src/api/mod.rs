@@ -1,6 +1,5 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 pub mod client;
 
@@ -46,6 +45,7 @@ pub struct WorkflowState {
     pub name: String,
     #[serde(default)]
     pub color: String,
+    pub position: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,5 +61,4 @@ pub struct StoriesData {
 pub trait ShortcutApi {
     fn search_stories(&self, query: &str) -> Result<Vec<Story>>;
     fn get_workflows(&self) -> Result<Vec<Workflow>>;
-    fn get_workflow_state_map(&self) -> Result<HashMap<i64, String>>;
 }

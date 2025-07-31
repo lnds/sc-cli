@@ -1,7 +1,6 @@
-use crate::api::Story;
+use crate::api::{Story, Workflow, WorkflowState};
 use crate::ui::{App, draw};
 use ratatui::{backend::TestBackend, Terminal};
-use std::collections::HashMap;
 
 #[cfg(test)]
 mod tests {
@@ -23,10 +22,18 @@ mod tests {
             },
         ];
 
-        let mut workflow_map = HashMap::new();
-        workflow_map.insert(456, "In Progress".to_string());
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Default Workflow".to_string(),
+            states: vec![WorkflowState {
+                id: 456,
+                name: "In Progress".to_string(),
+                color: "#f39c12".to_string(),
+                position: 1,
+            }],
+        }];
 
-        App::new(stories, workflow_map)
+        App::new(stories, workflows)
     }
 
     #[test]
@@ -67,7 +74,6 @@ mod tests {
     fn test_render_detail_view() {
         let mut app = create_test_app();
         app.show_detail = true;
-        app.list_state.select(Some(0));
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -107,8 +113,8 @@ mod tests {
     #[test]
     fn test_render_empty_list() {
         let stories = vec![];
-        let workflow_map = HashMap::new();
-        let app = App::new(stories, workflow_map);
+        let workflows = vec![];
+        let app = App::new(stories, workflows);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -161,8 +167,27 @@ mod tests {
             },
         ];
 
-        let workflow_map = HashMap::new();
-        let app = App::new(stories, workflow_map);
+        let workflows = vec![
+            Workflow {
+                id: 1,
+                name: "Default Workflow".to_string(),
+                states: vec![
+                    WorkflowState {
+                        id: 10,
+                        name: "To Do".to_string(),
+                        color: "#000000".to_string(),
+                        position: 1,
+                    },
+                    WorkflowState {
+                        id: 20,
+                        name: "In Progress".to_string(),
+                        color: "#f39c12".to_string(),
+                        position: 2,
+                    },
+                ],
+            },
+        ];
+        let app = App::new(stories, workflows);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();

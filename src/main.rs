@@ -47,13 +47,13 @@ fn main() -> Result<()> {
     let client = ShortcutClient::new(args.token, args.debug)
         .context("Failed to create Shortcut client")?;
 
-    // Get workflow states
+    // Get workflows
     if args.debug {
-        eprintln!("Fetching workflow states...");
+        eprintln!("Fetching workflows...");
     }
-    let workflow_map = client
-        .get_workflow_state_map()
-        .context("Failed to fetch workflow states")?;
+    let workflows = client
+        .get_workflows()
+        .context("Failed to fetch workflows")?;
 
     // Build search query
     let query = if let Some(search) = args.search {
@@ -98,7 +98,7 @@ fn main() -> Result<()> {
     setup_terminal()?;
 
     // Run app
-    let app = App::new(stories, workflow_map);
+    let app = App::new(stories, workflows);
     let result = run_app(app);
 
     // Restore terminal

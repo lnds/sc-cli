@@ -1,6 +1,5 @@
-use crate::api::Story;
+use crate::api::{Story, Workflow, WorkflowState};
 use crate::ui::App;
-use std::collections::HashMap;
 
 #[cfg(test)]
 mod tests {
@@ -48,100 +47,134 @@ mod tests {
         ]
     }
 
-    fn create_test_workflow_map() -> HashMap<i64, String> {
-        let mut map = HashMap::new();
-        map.insert(10, "To Do".to_string());
-        map.insert(20, "In Progress".to_string());
-        map.insert(30, "Done".to_string());
-        map
+    fn create_test_workflows() -> Vec<Workflow> {
+        vec![Workflow {
+            id: 1,
+            name: "Default Workflow".to_string(),
+            states: vec![
+                WorkflowState {
+                    id: 10,
+                    name: "To Do".to_string(),
+                    color: "#000000".to_string(),
+                    position: 1,
+                },
+                WorkflowState {
+                    id: 20,
+                    name: "In Progress".to_string(),
+                    color: "#f39c12".to_string(),
+                    position: 2,
+                },
+                WorkflowState {
+                    id: 30,
+                    name: "Done".to_string(),
+                    color: "#27ae60".to_string(),
+                    position: 3,
+                },
+            ],
+        }]
     }
 
     #[test]
     fn test_app_creation() {
         let stories = create_test_stories();
-        let workflow_map = create_test_workflow_map();
-        let app = App::new(stories.clone(), workflow_map.clone());
+        let workflows = create_test_workflows();
+        let app = App::new(stories.clone(), workflows);
 
-        assert_eq!(app.stories.len(), 3);
-        assert_eq!(app.list_state.selected(), Some(0));
+        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_row, 0);
         assert!(!app.show_detail);
         assert!(!app.should_quit);
         assert_eq!(app.workflow_state_map.len(), 3);
+        assert_eq!(app.workflow_states.len(), 3);
+        assert_eq!(app.stories_by_state.len(), 3);
     }
 
     #[test]
     fn test_app_creation_empty_stories() {
         let stories = vec![];
-        let workflow_map = create_test_workflow_map();
-        let app = App::new(stories, workflow_map);
+        let workflows = create_test_workflows();
+        let app = App::new(stories, workflows);
 
-        assert!(app.stories.is_empty());
-        assert_eq!(app.list_state.selected(), None);
+        assert_eq!(app.workflow_states.len(), 0);
+        assert_eq!(app.stories_by_state.len(), 0);
     }
 
     #[test]
     fn test_navigation_next() {
         let stories = create_test_stories();
-        let workflow_map = create_test_workflow_map();
-        let mut app = App::new(stories, workflow_map);
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
 
-        // Start at index 0
-        assert_eq!(app.list_state.selected(), Some(0));
+        // We have 3 stories, each in different workflow state
+        // The app should have 3 columns, one for each state
+        assert_eq!(app.workflow_states.len(), 3);
+        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_row, 0);
 
-        // Move to next
+        // Since each workflow state has only one story,
+        // next() should wrap around to the same story
         app.next();
-        assert_eq!(app.list_state.selected(), Some(1));
+        assert_eq!(app.selected_row, 0);
 
-        // Move to next
-        app.next();
-        assert_eq!(app.list_state.selected(), Some(2));
-
-        // Wrap around to beginning
-        app.next();
-        assert_eq!(app.list_state.selected(), Some(0));
+        // Switch to next column and test navigation there
+        app.next_column();
+        assert_eq!(app.selected_column, 1);
+        assert_eq!(app.selected_row, 0);
     }
 
     #[test]
     fn test_navigation_previous() {
         let stories = create_test_stories();
-        let workflow_map = create_test_workflow_map();
-        let mut app = App::new(stories, workflow_map);
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
 
-        // Start at index 0
-        assert_eq!(app.list_state.selected(), Some(0));
+        // Start at column 0, row 0
+        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_row, 0);
 
-        // Move to previous (wraps to end)
+        // Since each workflow state has only one story,
+        // previous() should wrap around to the same story
         app.previous();
-        assert_eq!(app.list_state.selected(), Some(2));
+        assert_eq!(app.selected_row, 0);
 
-        // Move to previous
-        app.previous();
-        assert_eq!(app.list_state.selected(), Some(1));
+        // Test column navigation
+        app.previous_column();
+        assert_eq!(app.selected_column, 2); // Wrapped to last column
 
-        // Move to previous
-        app.previous();
-        assert_eq!(app.list_state.selected(), Some(0));
+        app.previous_column();
+        assert_eq!(app.selected_column, 1);
+
+        app.previous_column();
+        assert_eq!(app.selected_column, 0);
     }
 
     #[test]
     fn test_navigation_empty_stories() {
         let stories = vec![];
-        let workflow_map = create_test_workflow_map();
-        let mut app = App::new(stories, workflow_map);
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
 
         // Should not crash on empty list
         app.next();
-        assert_eq!(app.list_state.selected(), None);
+        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_row, 0);
 
         app.previous();
-        assert_eq!(app.list_state.selected(), None);
+        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_row, 0);
+        
+        app.next_column();
+        assert_eq!(app.selected_column, 0);
+        
+        app.previous_column();
+        assert_eq!(app.selected_column, 0);
     }
 
     #[test]
     fn test_toggle_detail() {
         let stories = create_test_stories();
-        let workflow_map = create_test_workflow_map();
-        let mut app = App::new(stories, workflow_map);
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
 
         assert!(!app.show_detail);
 
@@ -157,8 +190,8 @@ mod tests {
     #[test]
     fn test_toggle_detail_empty_stories() {
         let stories = vec![];
-        let workflow_map = create_test_workflow_map();
-        let mut app = App::new(stories, workflow_map);
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
 
         // Should not toggle on empty list
         app.toggle_detail();

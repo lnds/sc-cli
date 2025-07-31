@@ -63,9 +63,9 @@ mod tests {
             "id": 1,
             "name": "Default Workflow",
             "states": [
-                {"id": 10, "name": "To Do", "color": "#cccccc"},
-                {"id": 20, "name": "In Progress", "color": "#0000ff"},
-                {"id": 30, "name": "Done", "color": "#00ff00"}
+                {"id": 10, "name": "To Do", "color": "#cccccc", "position": 1},
+                {"id": 20, "name": "In Progress", "color": "#0000ff", "position": 2},
+                {"id": 30, "name": "Done", "color": "#00ff00", "position": 3}
             ]
         });
 
@@ -75,8 +75,11 @@ mod tests {
         assert_eq!(workflow.name, "Default Workflow");
         assert_eq!(workflow.states.len(), 3);
         assert_eq!(workflow.states[0].name, "To Do");
+        assert_eq!(workflow.states[0].position, 1);
         assert_eq!(workflow.states[1].name, "In Progress");
+        assert_eq!(workflow.states[1].position, 2);
         assert_eq!(workflow.states[2].name, "Done");
+        assert_eq!(workflow.states[2].position, 3);
     }
 
     #[test]

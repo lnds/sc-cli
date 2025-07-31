@@ -1,7 +1,6 @@
 use super::*;
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
-use std::collections::HashMap;
 
 pub struct ShortcutClient {
     pub(crate) client: Client,
@@ -96,18 +95,5 @@ impl ShortcutApi for ShortcutClient {
             .context("Failed to parse workflows response")?;
 
         Ok(workflows)
-    }
-
-    fn get_workflow_state_map(&self) -> Result<HashMap<i64, String>> {
-        let workflows = self.get_workflows()?;
-        let mut state_map = HashMap::new();
-
-        for workflow in workflows {
-            for state in workflow.states {
-                state_map.insert(state.id, state.name);
-            }
-        }
-
-        Ok(state_map)
     }
 }

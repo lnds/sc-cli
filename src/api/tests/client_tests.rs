@@ -110,9 +110,9 @@ mod tests {
                 "id": 1,
                 "name": "Default Workflow",
                 "states": [
-                    {"id": 10, "name": "To Do", "color": "#cccccc"},
-                    {"id": 20, "name": "In Progress", "color": "#0000ff"},
-                    {"id": 30, "name": "Done", "color": "#00ff00"}
+                    {"id": 10, "name": "To Do", "color": "#cccccc", "position": 1},
+                    {"id": 20, "name": "In Progress", "color": "#0000ff", "position": 2},
+                    {"id": 30, "name": "Done", "color": "#00ff00", "position": 3}
                 ]
             }
         ]);
@@ -133,46 +133,6 @@ mod tests {
         assert_eq!(workflows[0].states.len(), 3);
     }
 
-    #[test]
-    fn test_get_workflow_state_map() {
-        let mut server = mockito::Server::new();
-        let url = server.url();
-        
-        let mock_response = json!([
-            {
-                "id": 1,
-                "name": "Workflow 1",
-                "states": [
-                    {"id": 10, "name": "To Do", "color": "#cccccc"},
-                    {"id": 20, "name": "In Progress", "color": "#0000ff"}
-                ]
-            },
-            {
-                "id": 2,
-                "name": "Workflow 2",
-                "states": [
-                    {"id": 30, "name": "Done", "color": "#00ff00"},
-                    {"id": 40, "name": "Archived", "color": "#888888"}
-                ]
-            }
-        ]);
-
-        let _m = server.mock("GET", "/workflows")
-            .match_header("Shortcut-Token", "test-token")
-            .with_status(200)
-            .with_header("content-type", "application/json")
-            .with_body(mock_response.to_string())
-            .create();
-
-        let client = create_test_client(&url);
-        let state_map = client.get_workflow_state_map().unwrap();
-
-        assert_eq!(state_map.len(), 4);
-        assert_eq!(state_map.get(&10).unwrap(), "To Do");
-        assert_eq!(state_map.get(&20).unwrap(), "In Progress");
-        assert_eq!(state_map.get(&30).unwrap(), "Done");
-        assert_eq!(state_map.get(&40).unwrap(), "Archived");
-    }
 
     #[test]
     fn test_debug_mode_output() {

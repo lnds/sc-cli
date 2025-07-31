@@ -74,9 +74,22 @@ user_id = "your.work.mention.name"
 
 - **↑/k** - Move up in the story list
 - **↓/j** - Move down in the story list
+- **←/h** - Move to previous column (workflow state)
+- **→/l** - Move to next column (workflow state)
 - **Enter** - View story details
-- **Esc** - Close detail view
+- **Space** - Move story to a different workflow state
+- **Esc** - Close detail view or cancel state selection
 - **q** - Quit the application
+
+#### Moving Stories Between States
+
+When you press **Space** on a selected story:
+1. A state selector dialog appears showing available workflow states
+2. Use **↑/k** or **↓/j** to navigate through the states
+3. Press **Enter** to confirm and move the story
+4. Press **Esc** to cancel without making changes
+
+The story will be immediately updated in Shortcut and moved to the appropriate column in the UI.
 
 ### Examples
 
@@ -124,6 +137,9 @@ The application supports Shortcut's search syntax. By default, it searches for `
 
 The TUI shows:
 
+- Stories organized in columns by workflow state (To Do, In Progress, Done, etc.)
+- All workflow states are displayed, even if they contain no stories
+- Story count for each column in the header
 - Story list with ID and name
 - Detail popup with:
   - Story ID
@@ -132,6 +148,7 @@ The TUI shows:
   - Workflow State
   - Description
   - Shortcut URL
+- State selector dialog for moving stories between workflow states
 
 ### Error Handling
 

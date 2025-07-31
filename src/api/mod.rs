@@ -61,4 +61,5 @@ pub struct StoriesData {
 pub trait ShortcutApi {
     fn search_stories(&self, query: &str) -> Result<Vec<Story>>;
     fn get_workflows(&self) -> Result<Vec<Workflow>>;
+    fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story>;
 }

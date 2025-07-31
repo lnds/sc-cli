@@ -1,5 +1,5 @@
 use crate::api::{Story, Workflow};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, KeyCode};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -14,6 +14,8 @@ mod tests;
 
 pub struct App {
     pub show_detail: bool,
+    pub show_state_selector: bool,
+    pub state_selector_index: usize,
     pub workflow_state_map: HashMap<i64, String>,
     pub should_quit: bool,
     pub selected_column: usize,
@@ -57,6 +59,8 @@ impl App {
 
         Self {
             show_detail: false,
+            show_state_selector: false,
+            state_selector_index: 0,
             workflow_state_map,
             should_quit: false,
             selected_column: 0,
@@ -135,21 +139,81 @@ impl App {
             .and_then(|stories| stories.get(self.selected_row))
     }
 
-    pub fn handle_events(&mut self) -> anyhow::Result<()> {
-        if event::poll(std::time::Duration::from_millis(50))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') => self.should_quit = true,
-                        KeyCode::Char('j') | KeyCode::Down => self.next(),
-                        KeyCode::Char('k') | KeyCode::Up => self.previous(),
-                        KeyCode::Char('l') | KeyCode::Right => self.next_column(),
-                        KeyCode::Char('h') | KeyCode::Left => self.previous_column(),
-                        KeyCode::Enter => self.toggle_detail(),
-                        KeyCode::Esc if self.show_detail => self.show_detail = false,
-                        _ => {}
-                    }
+    pub fn toggle_state_selector(&mut self) {
+        if !self.workflow_states.is_empty() {
+            let state_id = self.workflow_states[self.selected_column].0;
+            if let Some(stories) = self.stories_by_state.get(&state_id) {
+                if !stories.is_empty() {
+                    self.show_state_selector = true;
+                    self.state_selector_index = 0;
                 }
+            }
+        }
+    }
+
+    pub fn next_state_selection(&mut self) {
+        if let Some(story) = self.get_selected_story() {
+            let available_states = self.get_available_states_for_story(story);
+            if !available_states.is_empty() {
+                self.state_selector_index = (self.state_selector_index + 1) % available_states.len();
+            }
+        }
+    }
+
+    pub fn previous_state_selection(&mut self) {
+        if let Some(story) = self.get_selected_story() {
+            let available_states = self.get_available_states_for_story(story);
+            if !available_states.is_empty() {
+                if self.state_selector_index == 0 {
+                    self.state_selector_index = available_states.len() - 1;
+                } else {
+                    self.state_selector_index -= 1;
+                }
+            }
+        }
+    }
+
+    pub fn get_available_states_for_story(&self, story: &Story) -> Vec<(i64, String)> {
+        self.workflow_states
+            .iter()
+            .filter(|(state_id, _)| *state_id != story.workflow_state_id)
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_selected_target_state(&self) -> Option<i64> {
+        if let Some(story) = self.get_selected_story() {
+            let available_states = self.get_available_states_for_story(story);
+            available_states.get(self.state_selector_index).map(|(id, _)| *id)
+        } else {
+            None
+        }
+    }
+
+    pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
+        if self.show_state_selector {
+            // Handle state selector navigation
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => self.next_state_selection(),
+                KeyCode::Char('k') | KeyCode::Up => self.previous_state_selection(),
+                KeyCode::Esc => {
+                    self.show_state_selector = false;
+                    self.state_selector_index = 0;
+                }
+                _ => {}
+            }
+        } else {
+            // Normal navigation
+            match key.code {
+                KeyCode::Char('q') => self.should_quit = true,
+                KeyCode::Char('j') | KeyCode::Down => self.next(),
+                KeyCode::Char('k') | KeyCode::Up => self.previous(),
+                KeyCode::Char('l') | KeyCode::Right => self.next_column(),
+                KeyCode::Char('h') | KeyCode::Left => self.previous_column(),
+                KeyCode::Enter => self.toggle_detail(),
+                KeyCode::Char(' ') => self.toggle_state_selector(),
+                KeyCode::Esc if self.show_detail => self.show_detail = false,
+                _ => {}
             }
         }
         Ok(())
@@ -236,10 +300,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
 
     // Footer
-    let footer_text = if app.show_detail {
+    let footer_text = if app.show_state_selector {
+        "[↑/k] [↓/j] select state | [Enter] confirm | [Esc] cancel"
+    } else if app.show_detail {
         "Press [Esc] to close detail | [q] to quit"
     } else {
-        "[←/h] [→/l] switch columns | [↑/k] [↓/j] navigate | [Enter] details | [q] quit"
+        "[←/h] [→/l] switch columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [q] quit"
     };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(Color::DarkGray))
@@ -251,6 +317,13 @@ pub fn draw(frame: &mut Frame, app: &App) {
     if app.show_detail {
         if let Some(story) = app.get_selected_story() {
             draw_detail_popup(frame, story, &app.workflow_state_map);
+        }
+    }
+
+    // State selector popup
+    if app.show_state_selector {
+        if let Some(story) = app.get_selected_story() {
+            draw_state_selector_popup(frame, story, app);
         }
     }
 }
@@ -315,6 +388,42 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, workflow_map: &HashMap<i6
         .wrap(Wrap { trim: true });
 
     frame.render_widget(paragraph, area);
+}
+
+fn draw_state_selector_popup(frame: &mut Frame, story: &Story, app: &App) {
+    let area = centered_rect(50, 40, frame.area());
+    frame.render_widget(Clear, area);
+
+    let available_states = app.get_available_states_for_story(story);
+    
+    // Create list items for available states
+    let items: Vec<ListItem> = available_states
+        .iter()
+        .enumerate()
+        .map(|(idx, (_, state_name))| {
+            let content = format!(" {} ", state_name);
+            let style = if idx == app.state_selector_index {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            ListItem::new(content).style(style)
+        })
+        .collect();
+
+    let title = format!(" Move Story #{} to: ", story.id);
+    
+    let list = List::new(items)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+            .border_style(Style::default().fg(Color::Yellow)));
+    
+    frame.render_widget(list, area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

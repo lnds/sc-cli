@@ -36,6 +36,28 @@ cargo run -- <username> --token <your-api-token>
 
 You can either create a `config.toml` file manually based on `config.toml.example`, or let the tool create it interactively:
 
+#### Default Workspace
+
+If you have only one workspace configured, it will be used automatically:
+
+```bash
+# With single workspace, no need to specify --workspace
+cargo run
+```
+
+For multiple workspaces, you can set a default in the config file:
+
+```toml
+default_workspace = "personal"
+```
+
+Then run without arguments:
+
+```bash
+# Uses the default workspace
+cargo run
+```
+
 #### Interactive Setup (Easy Way)
 
 Simply run with a workspace name and the tool will guide you through setup:
@@ -53,6 +75,7 @@ The tool will:
 2. Let you choose where to save it (default: `~/.config/sc-tui/config.toml`)
 3. Prompt for your Shortcut API key
 4. Prompt for your Shortcut mention name
+5. Set this as the default workspace if it's the first one
 
 #### Manual Setup
 
@@ -60,6 +83,9 @@ Create a `config.toml` file:
 
 ```toml
 workspaces = ["personal", "work"]
+
+# Optional: specify default workspace
+default_workspace = "personal"
 
 [personal]
 api_key = "your-personal-api-key"

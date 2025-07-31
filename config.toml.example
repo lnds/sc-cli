@@ -8,6 +8,9 @@
 # List all workspace names
 workspaces = ["personal", "work", "client"]
 
+# Optional: specify default workspace (if not set, single workspace will be used as default)
+# default_workspace = "personal"
+
 # Configuration for 'personal' workspace
 [personal]
 api_key = "your-personal-api-key"

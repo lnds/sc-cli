@@ -25,7 +25,7 @@ struct Args {
     #[arg(short, long)]
     token: Option<String>,
 
-    /// Workspace name from config file
+    /// Workspace name from config file (optional if default workspace is set)
     #[arg(short, long)]
     workspace: Option<String>,
 
@@ -51,12 +51,28 @@ fn main() -> Result<()> {
 
     // Get token and username from args or config
     let (token, username) = if let Some(workspace_name) = args.workspace {
-        // Load config and get workspace settings, creating if necessary
+        // Use explicitly specified workspace
         let (config, _created) = Config::load_or_create(&workspace_name)
             .context("Failed to load or create config")?;
         let workspace = config.get_workspace(&workspace_name)
             .context(format!("Failed to get workspace '{}'", workspace_name))?;
         (workspace.api_key.clone(), workspace.user_id.clone())
+    } else if args.token.is_none() && args.username.is_none() {
+        // No args provided, try to use default workspace
+        match Config::load() {
+            Ok(config) => {
+                if let Some(default_workspace_name) = config.get_default_workspace() {
+                    let workspace = config.get_workspace(&default_workspace_name)
+                        .context(format!("Failed to get default workspace '{}'", default_workspace_name))?;
+                    (workspace.api_key.clone(), workspace.user_id.clone())
+                } else {
+                    anyhow::bail!("No default workspace configured. Use --workspace to specify one or provide --token and username");
+                }
+            }
+            Err(_) => {
+                anyhow::bail!("No configuration file found. Use --workspace to create one or provide --token and username");
+            }
+        }
     } else {
         // Use command line arguments
         let token = args.token

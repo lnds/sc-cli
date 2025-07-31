@@ -6,7 +6,7 @@ fn test_cli_without_args() {
     let mut cmd = Command::cargo_bin("sc-tui").unwrap();
     cmd.assert()
         .failure()
-        .stderr(predicate::str::contains("Either --token or --workspace must be provided"));
+        .stderr(predicate::str::contains("No default workspace configured").or(predicate::str::contains("No configuration file found")));
 }
 
 #[test]

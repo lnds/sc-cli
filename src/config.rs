@@ -8,6 +8,8 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub workspaces: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_workspace: Option<String>,
     #[serde(flatten)]
     pub workspace_configs: HashMap<String, WorkspaceConfig>,
 }
@@ -90,6 +92,7 @@ impl Config {
         
         let config = Config {
             workspaces: vec![workspace_name.to_string()],
+            default_workspace: Some(workspace_name.to_string()),
             workspace_configs,
         };
         
@@ -147,6 +150,11 @@ impl Config {
         }
         self.workspace_configs.insert(name.to_string(), config);
         
+        // If this is the first workspace and no default is set, make it default
+        if self.workspaces.len() == 1 && self.default_workspace.is_none() {
+            self.default_workspace = Some(name.to_string());
+        }
+        
         // Save the updated config
         let config_path = Self::find_config_path()?;
         self.save(&config_path)?;
@@ -168,6 +176,22 @@ impl Config {
         self.workspace_configs
             .get(name)
             .ok_or_else(|| anyhow::anyhow!("Workspace '{}' not found in config", name))
+    }
+    
+    pub fn get_default_workspace(&self) -> Option<String> {
+        // If default_workspace is explicitly set, use it
+        if let Some(ref default) = self.default_workspace {
+            if self.workspace_configs.contains_key(default) {
+                return Some(default.clone());
+            }
+        }
+        
+        // If only one workspace exists, use it as default
+        if self.workspaces.len() == 1 {
+            return Some(self.workspaces[0].clone());
+        }
+        
+        None
     }
     
     fn find_config_path() -> Result<PathBuf> {
@@ -208,6 +232,9 @@ impl Config {
 # 
 # List all workspace names
 workspaces = ["personal", "work", "client"]
+
+# Optional: specify default workspace (if not set, single workspace will be used as default)
+default_workspace = "personal"
 
 # Configuration for 'personal' workspace
 [personal]
@@ -275,5 +302,79 @@ user_id = "test.user"
         let result = config.get_workspace("nonexistent");
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Workspace 'nonexistent' not found"));
+    }
+    
+    #[test]
+    fn test_default_workspace_single() {
+        let config_content = r#"
+workspaces = ["only"]
+
+[only]
+api_key = "only-key"
+user_id = "only.user"
+"#;
+
+        let config: Config = toml::from_str(config_content).unwrap();
+        
+        // Should return the only workspace as default
+        assert_eq!(config.get_default_workspace(), Some("only".to_string()));
+    }
+    
+    #[test]
+    fn test_default_workspace_explicit() {
+        let config_content = r#"
+workspaces = ["test", "prod"]
+default_workspace = "prod"
+
+[test]
+api_key = "test-key"
+user_id = "test.user"
+
+[prod]
+api_key = "prod-key"
+user_id = "prod.user"
+"#;
+
+        let config: Config = toml::from_str(config_content).unwrap();
+        
+        // Should return the explicitly set default
+        assert_eq!(config.get_default_workspace(), Some("prod".to_string()));
+    }
+    
+    #[test]
+    fn test_default_workspace_multiple_no_default() {
+        let config_content = r#"
+workspaces = ["test", "prod"]
+
+[test]
+api_key = "test-key"
+user_id = "test.user"
+
+[prod]
+api_key = "prod-key"
+user_id = "prod.user"
+"#;
+
+        let config: Config = toml::from_str(config_content).unwrap();
+        
+        // Should return None when multiple workspaces and no default set
+        assert_eq!(config.get_default_workspace(), None);
+    }
+    
+    #[test]
+    fn test_default_workspace_invalid_default() {
+        let config_content = r#"
+workspaces = ["test"]
+default_workspace = "nonexistent"
+
+[test]
+api_key = "test-key"
+user_id = "test.user"
+"#;
+
+        let config: Config = toml::from_str(config_content).unwrap();
+        
+        // Should fallback to single workspace when default is invalid
+        assert_eq!(config.get_default_workspace(), Some("test".to_string()));
     }
 }

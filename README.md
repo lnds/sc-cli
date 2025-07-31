@@ -22,12 +22,52 @@ cargo build --release
 
 ## Usage
 
+### Using Command Line Arguments
+
 ```bash
 # Run the TUI
 cargo run -- <username> --token <your-api-token>
 
 # Or use the compiled binary
 ./target/release/sc-tui <username> --token <your-api-token>
+```
+
+### Using Configuration File (Recommended)
+
+You can either create a `config.toml` file manually based on `config.toml.example`, or let the tool create it interactively:
+
+#### Interactive Setup (Easy Way)
+
+Simply run with a workspace name and the tool will guide you through setup:
+
+```bash
+# First time setup - will prompt to create config
+cargo run -- --workspace personal
+
+# Short form
+cargo run -- -w work
+```
+
+The tool will:
+1. Ask if you want to create the configuration
+2. Let you choose where to save it (default: `~/.config/sc-tui/config.toml`)
+3. Prompt for your Shortcut API key
+4. Prompt for your Shortcut mention name
+
+#### Manual Setup
+
+Create a `config.toml` file:
+
+```toml
+workspaces = ["personal", "work"]
+
+[personal]
+api_key = "your-personal-api-key"
+user_id = "your.mention.name"
+
+[work]
+api_key = "your-work-api-key"
+user_id = "your.work.mention.name"
 ```
 
 ### TUI Navigation
@@ -41,23 +81,28 @@ cargo run -- <username> --token <your-api-token>
 ### Examples
 
 ```bash
-# Basic usage
+# Basic usage with command line args
 cargo run -- john.doe --token YOUR_API_TOKEN
+
+# Using workspace from config
+cargo run -- --workspace personal
+cargo run -- -w work
 
 # With options
 cargo run -- john.doe --token YOUR_API_TOKEN --limit 20 --story-type feature
 
 # Custom search (overrides default filters)
-cargo run -- john.doe --token YOUR_API_TOKEN --search "state:done updated:\"last week\""
+cargo run -- --workspace work --search "state:done updated:\"last week\""
 
 # Enable debug output for troubleshooting
-cargo run -- john.doe --token YOUR_API_TOKEN --debug
+cargo run -- -w personal --debug
 ```
 
 ### Command-line Options
 
-- `username` (required) - The Shortcut username to search for
-- `--token` (required) - Your Shortcut API token
+- `username` - The Shortcut mention name to search for (required if not using --workspace)
+- `--token` - Your Shortcut API token (required if not using --workspace)
+- `--workspace` / `-w` - Workspace name from config file (alternative to username/token)
 - `--limit` (optional) - Maximum number of stories to display (default: 25)
 - `--story-type` (optional) - Filter by story type: feature, bug, chore
 - `--search` (optional) - Custom search query using Shortcut's search syntax

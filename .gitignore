@@ -27,6 +27,9 @@ Thumbs.db
 .env
 .env.local
 
+# Configuration files with sensitive data
+config.toml
+
 # asdf
 .tool-versions.local
 

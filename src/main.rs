@@ -62,7 +62,7 @@ fn main() -> Result<()> {
         let mut query_parts = vec![format!("owner:{}", args.username)];
         
         if let Some(story_type) = args.story_type {
-            query_parts.push(format!("type:{}", story_type));
+            query_parts.push(format!("type:{story_type}"));
         }
         
         query_parts.push("is:story".to_string());
@@ -72,14 +72,14 @@ fn main() -> Result<()> {
     // Search for stories
     if args.debug {
         eprintln!("Searching for stories...");
-        eprintln!("Query: {}", query);
+        eprintln!("Query: {query}");
     }
     let mut stories = client
         .search_stories(&query)
         .context("Failed to search stories")?;
 
     if stories.is_empty() {
-        eprintln!("No stories found for query: {}", query);
+        eprintln!("No stories found for query: {query}");
         eprintln!("Try using a different search query or check if the username is correct.");
         return Ok(());
     }

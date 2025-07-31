@@ -41,7 +41,7 @@ impl ShortcutApi for ShortcutClient {
     fn search_stories(&self, query: &str) -> Result<Vec<Story>> {
         let url = format!("{}/search", self.base_url);
         if self.debug {
-            eprintln!("Searching with query: {}", query);
+            eprintln!("Searching with query: {query}");
         }
         
         let response = self
@@ -54,7 +54,7 @@ impl ShortcutApi for ShortcutClient {
 
         let status = response.status();
         if self.debug {
-            eprintln!("Response status: {}", status);
+            eprintln!("Response status: {status}");
         }
         
         if !status.is_success() {

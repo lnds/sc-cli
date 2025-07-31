@@ -96,4 +96,40 @@ impl ShortcutApi for ShortcutClient {
 
         Ok(workflows)
     }
+
+    fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story> {
+        let url = format!("{}/stories/{}", self.base_url, story_id);
+        
+        let update_payload = serde_json::json!({
+            "workflow_state_id": workflow_state_id
+        });
+
+        if self.debug {
+            eprintln!("Updating story {} to workflow state {}", story_id, workflow_state_id);
+        }
+        
+        let response = self
+            .client
+            .put(&url)
+            .headers(self.headers())
+            .json(&update_payload)
+            .send()
+            .context("Failed to send story update request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Update response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to update story state: {}. Error: {}", status, error_text);
+        }
+
+        let updated_story: Story = response
+            .json()
+            .context("Failed to parse updated story response")?;
+
+        Ok(updated_story)
+    }
 }

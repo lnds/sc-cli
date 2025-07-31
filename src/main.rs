@@ -122,7 +122,7 @@ fn main() -> Result<()> {
 
     // Run app
     let app = App::new(stories, workflows);
-    let result = run_app(app);
+    let result = run_app(app, client);
 
     // Restore terminal
     restore_terminal()?;
@@ -144,14 +144,43 @@ fn restore_terminal() -> Result<()> {
     Ok(())
 }
 
-fn run_app(mut app: App) -> Result<()> {
+fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
     loop {
         terminal.draw(|f| ui::draw(f, &app))?;
 
-        app.handle_events()?;
+        if crossterm::event::poll(std::time::Duration::from_millis(50))? {
+            if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
+                if key.kind == crossterm::event::KeyEventKind::Press {
+                    // Special handling for Enter in state selector
+                    if app.show_state_selector && key.code == crossterm::event::KeyCode::Enter {
+                        let story_update = app.get_selected_story().map(|story| {
+                            (story.id, app.get_selected_target_state())
+                        });
+                        
+                        if let Some((story_id, Some(target_state_id))) = story_update {
+                            // Update story state via API
+                            match client.update_story_state(story_id, target_state_id) {
+                                Ok(updated_story) => {
+                                    // Update the story in our local data
+                                    update_story_state(&mut app, story_id, updated_story);
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to update story state: {}", e);
+                                }
+                            }
+                        }
+                        app.show_state_selector = false;
+                        app.state_selector_index = 0;
+                    } else {
+                        // Handle all other events normally
+                        app.handle_key_event(key)?;
+                    }
+                }
+            }
+        }
 
         if app.should_quit {
             break;
@@ -159,4 +188,33 @@ fn run_app(mut app: App) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn update_story_state(app: &mut App, story_id: i64, updated_story: api::Story) {
+    // Find and remove the story from its current state
+    let mut old_state_id = None;
+    for (&state_id, stories) in app.stories_by_state.iter_mut() {
+        if let Some(pos) = stories.iter().position(|s| s.id == story_id) {
+            stories.remove(pos);
+            old_state_id = Some(state_id);
+            break;
+        }
+    }
+
+    // Add the story to its new state
+    app.stories_by_state
+        .entry(updated_story.workflow_state_id)
+        .or_default()
+        .push(updated_story);
+
+    // If we removed from the current column and it's now empty, reset selected_row
+    if let Some(old_id) = old_state_id {
+        if app.workflow_states.get(app.selected_column).map(|(id, _)| *id) == Some(old_id) {
+            if let Some(stories) = app.stories_by_state.get(&old_id) {
+                if stories.is_empty() || app.selected_row >= stories.len() {
+                    app.selected_row = 0;
+                }
+            }
+        }
+    }
 }

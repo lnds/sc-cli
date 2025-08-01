@@ -3,7 +3,7 @@ use crossterm::event::{self, KeyCode};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
@@ -294,6 +294,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
         for (idx, (state_id, state_name)) in app.workflow_states.iter().enumerate() {
             let is_selected_column = idx == app.selected_column;
             
+            // Get the actual column width
+            let column_rect = columns[idx];
+            // Account for borders (2) and some padding (2)
+            let available_width = column_rect.width.saturating_sub(4) as usize;
+            
             // Get stories for this state
             let stories = app.stories_by_state.get(state_id)
                 .map(|s| s.as_slice())
@@ -302,8 +307,6 @@ pub fn draw(frame: &mut Frame, app: &App) {
             // Create list items
             let items: Vec<ListItem> = stories.iter().enumerate()
                 .map(|(story_idx, story)| {
-                    let content = format!("[#{}] {}", story.id, story.name);
-                    
                     // Check if story is owned by current user
                     let is_owned = app.current_user_id.as_ref()
                         .map(|uid| story.owner_ids.contains(uid))
@@ -320,7 +323,99 @@ pub fn draw(frame: &mut Frame, app: &App) {
                     } else {
                         Style::default().fg(Color::White)
                     };
-                    ListItem::new(content).style(style)
+                    
+                    // Get icon for story type
+                    let type_icon = match story.story_type.as_str() {
+                        "feature" => "✨",
+                        "bug" => "🐛",
+                        "chore" => "🔧",
+                        _ => "📝",
+                    };
+                    
+                    // Create prefix for first line
+                    let prefix = format!("[#{}] {} ", story.id, type_icon);
+                    
+                    // Calculate available width for text based on actual column width
+                    let first_line_width = available_width.saturating_sub(prefix.len());
+                    let second_line_width = available_width;
+                    
+                    // Handle story name wrapping
+                    let mut line1_text = prefix.clone();
+                    let mut line2_text = String::new();
+                    
+                    if story.name.len() <= first_line_width {
+                        // Fits on one line
+                        line1_text.push_str(&story.name);
+                    } else {
+                        // Try to wrap at word boundaries
+                        let words: Vec<&str> = story.name.split_whitespace().collect();
+                        
+                        if !words.is_empty() {
+                            // Check if even the first word fits
+                            if words[0].len() > first_line_width {
+                                // First word is too long, put entire name on second line
+                                // But truncate if it's too long for the second line too
+                                if story.name.len() > second_line_width {
+                                    line2_text = story.name.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                } else {
+                                    line2_text = story.name.clone();
+                                }
+                            } else {
+                                // Normal word wrapping
+                                let mut current_length = 0;
+                                let mut on_second_line = false;
+                                
+                                for (i, word) in words.iter().enumerate() {
+                                    let word_len = word.len() + if i > 0 { 1 } else { 0 }; // +1 for space
+                                    
+                                    if !on_second_line && current_length + word_len <= first_line_width {
+                                        if i > 0 {
+                                            line1_text.push(' ');
+                                        }
+                                        line1_text.push_str(word);
+                                        current_length += word_len;
+                                    } else if !on_second_line {
+                                        // Moving to second line
+                                        on_second_line = true;
+                                        if word_len <= second_line_width {
+                                            line2_text.push_str(word);
+                                            current_length = word_len;
+                                        } else {
+                                            // Word is too long for second line, truncate
+                                            line2_text = word.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                            break;
+                                        }
+                                    } else {
+                                        // Already on second line
+                                        if current_length + word_len + 1 <= second_line_width {
+                                            line2_text.push(' ');
+                                            line2_text.push_str(word);
+                                            current_length += word_len + 1;
+                                        } else {
+                                            // No more room, add ellipsis
+                                            if line2_text.len() + 3 <= second_line_width {
+                                                line2_text.push_str("...");
+                                            } else {
+                                                line2_text = line2_text.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Create lines
+                    let line1 = Line::from(Span::styled(line1_text, style));
+                    let line2 = if line2_text.trim().is_empty() {
+                        Line::from(Span::styled("", style))
+                    } else {
+                        Line::from(Span::styled(line2_text, style))
+                    };
+                    
+                    let text = Text::from(vec![line1, line2]);
+                    ListItem::new(text)
                 })
                 .collect();
             

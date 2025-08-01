@@ -207,6 +207,25 @@ fn main() -> Result<()> {
         app.add_member_to_cache(id, name);
     }
     
+    // Try to get current user ID to highlight owned stories
+    if args.debug {
+        eprintln!("Fetching current user for story highlighting...");
+    }
+    match client.get_current_member() {
+        Ok(member) => {
+            if args.debug {
+                eprintln!("Current user: {} ({}) - ID: {}", member.name, member.mention_name, member.id);
+            }
+            app.set_current_user_id(member.id);
+        }
+        Err(e) => {
+            if args.debug {
+                eprintln!("Failed to get current user for highlighting: {}", e);
+                eprintln!("Owned stories will not be highlighted");
+            }
+        }
+    }
+    
     let result = run_app(app, client);
 
     // Restore terminal

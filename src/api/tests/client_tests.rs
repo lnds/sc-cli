@@ -49,7 +49,7 @@ mod tests {
             .create();
 
         let client = create_test_client(&url);
-        let stories = client.search_stories("owner:test").unwrap();
+        let stories = client.search_stories("owner:test", None).unwrap();
 
         assert_eq!(stories.len(), 1);
         assert_eq!(stories[0].id, 123);
@@ -77,7 +77,7 @@ mod tests {
             .create();
 
         let client = create_test_client(&url);
-        let stories = client.search_stories("owner:nobody").unwrap();
+        let stories = client.search_stories("owner:nobody", None).unwrap();
 
         assert!(stories.is_empty());
     }
@@ -94,7 +94,7 @@ mod tests {
             .create();
 
         let client = create_test_client(&url);
-        let result = client.search_stories("owner:test");
+        let result = client.search_stories("owner:test", None);
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -162,6 +162,60 @@ mod tests {
 
         // This test primarily ensures debug mode doesn't crash
         // In a real test environment, we'd capture stderr to verify output
-        let _ = client.search_stories("owner:test").unwrap();
+        let _ = client.search_stories("owner:test", None).unwrap();
+    }
+    
+    #[test]
+    fn test_search_stories_with_limit() {
+        let mut server = mockito::Server::new();
+        let url = server.url();
+        
+        // Create more stories than the limit
+        let mut stories_data = Vec::new();
+        for i in 1..=30 {
+            stories_data.push(json!({
+                "id": i,
+                "name": format!("Story {}", i),
+                "description": "",
+                "workflow_state_id": 456,
+                "app_url": format!("https://app.shortcut.com/org/story/{}", i),
+                "story_type": "feature",
+                "labels": [],
+                "owner_ids": ["user-123"],
+                "position": i * 1000,
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-02T00:00:00Z"
+            }));
+        }
+        
+        let mock_response = json!({
+            "stories": {
+                "data": stories_data,
+                "total": 30
+            }
+        });
+
+        let _m = server.mock("GET", "/search")
+            .match_query(mockito::Matcher::AllOf(vec![
+                mockito::Matcher::UrlEncoded("query".to_string(), "owner:test".to_string()),
+                mockito::Matcher::UrlEncoded("page_size".to_string(), "25".to_string()),
+            ]))
+            .match_header("Shortcut-Token", "test-token")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(mock_response.to_string())
+            .create();
+
+        let client = create_test_client(&url);
+        
+        // Test with limit
+        let stories = client.search_stories("owner:test", Some(10)).unwrap();
+        assert_eq!(stories.len(), 10);
+        assert_eq!(stories[0].id, 1);
+        assert_eq!(stories[9].id, 10);
+        
+        // Test without limit
+        let stories = client.search_stories("owner:test", None).unwrap();
+        assert_eq!(stories.len(), 30);
     }
 }

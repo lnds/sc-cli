@@ -15,13 +15,16 @@ workspaces = ["personal", "work", "client"]
 [personal]
 api_key = "your-personal-api-key"
 user_id = "your.mention.name"
+fetch_limit = 20  # Optional: defaults to 20 if not specified
 
 # Configuration for 'work' workspace  
 [work]
 api_key = "your-work-api-key"
 user_id = "your.work.mention.name"
+fetch_limit = 50  # Fetch more stories for work workspace
 
 # Configuration for 'client' workspace
 [client]
 api_key = "your-client-api-key"
 user_id = "your.client.mention.name"
+# fetch_limit not specified, will use default of 20

@@ -217,4 +217,89 @@ mod tests {
         assert!(buffer_str.contains("[#2]"));
         assert!(buffer_str.contains("Second Story"));
     }
+
+    #[test]
+    fn test_render_owned_stories_highlighting() {
+        let stories = vec![
+            Story {
+                id: 1,
+                name: "My Story".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10,
+                app_url: "".to_string(),
+                story_type: "".to_string(),
+                labels: vec![],
+                owner_ids: vec!["current-user".to_string()],
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+            },
+            Story {
+                id: 2,
+                name: "Other Story".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10,
+                app_url: "".to_string(),
+                story_type: "".to_string(),
+                labels: vec![],
+                owner_ids: vec!["another-user".to_string()],
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+            },
+        ];
+
+        let workflows = vec![
+            Workflow {
+                id: 1,
+                name: "Default Workflow".to_string(),
+                states: vec![
+                    WorkflowState {
+                        id: 10,
+                        name: "To Do".to_string(),
+                        color: "#000000".to_string(),
+                        position: 1,
+                    },
+                ],
+            },
+        ];
+        
+        let mut app = App::new(stories, workflows);
+        // Set current user to highlight owned stories
+        app.set_current_user_id("current-user".to_string());
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|f| draw(f, &app)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        
+        // Find the cells containing the owned story
+        let mut owned_story_color = None;
+        let mut other_story_color = None;
+        
+        for y in 0..buffer.area().height {
+            let mut line = String::new();
+            for x in 0..buffer.area().width {
+                if let Some(cell) = buffer.cell((x, y)) {
+                    line.push_str(cell.symbol());
+                    
+                    // Check color of cells containing story names
+                    if line.contains("[#1] My Story") && owned_story_color.is_none() {
+                        owned_story_color = Some(cell.style().fg);
+                    }
+                    if line.contains("[#2] Other Story") && other_story_color.is_none() {
+                        other_story_color = Some(cell.style().fg);
+                    }
+                }
+            }
+        }
+        
+        // Verify owned story has cyan color (Color::Cyan)
+        assert!(owned_story_color.is_some(), "Should find owned story");
+        assert!(other_story_color.is_some(), "Should find other story");
+        
+        // The owned story should have a different color than the other story
+        assert_ne!(owned_story_color, other_story_color, 
+            "Owned story should have different color than non-owned story");
+    }
 }

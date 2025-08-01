@@ -206,6 +206,24 @@ mod tests {
         assert!(!app.show_detail);
     }
 
+    #[test]
+    fn test_set_current_user_id() {
+        let stories = create_test_stories();
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
+
+        // Initially no current user
+        assert_eq!(app.current_user_id, None);
+
+        // Set current user
+        app.set_current_user_id("user1".to_string());
+        assert_eq!(app.current_user_id, Some("user1".to_string()));
+
+        // Change current user
+        app.set_current_user_id("user2".to_string());
+        assert_eq!(app.current_user_id, Some("user2".to_string()));
+    }
+
     // Note: Event handling tests would require mocking crossterm events
     // which is complex for unit tests. These are better suited for integration tests.
 }

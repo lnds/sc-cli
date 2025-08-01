@@ -19,6 +19,7 @@ pub struct App {
     pub take_ownership_requested: bool,
     pub workflow_state_map: HashMap<i64, String>,
     pub member_cache: HashMap<String, String>, // owner_id -> name
+    pub current_user_id: Option<String>, // ID of current user
     pub should_quit: bool,
     pub selected_column: usize,
     pub selected_row: usize,
@@ -66,6 +67,7 @@ impl App {
             take_ownership_requested: false,
             workflow_state_map,
             member_cache: HashMap::new(),
+            current_user_id: None,
             should_quit: false,
             selected_column: 0,
             selected_row: 0,
@@ -248,6 +250,10 @@ impl App {
     pub fn add_member_to_cache(&mut self, member_id: String, member_name: String) {
         self.member_cache.insert(member_id, member_name);
     }
+
+    pub fn set_current_user_id(&mut self, user_id: String) {
+        self.current_user_id = Some(user_id);
+    }
 }
 
 pub fn draw(frame: &mut Frame, app: &App) {
@@ -292,11 +298,20 @@ pub fn draw(frame: &mut Frame, app: &App) {
             let items: Vec<ListItem> = stories.iter().enumerate()
                 .map(|(story_idx, story)| {
                     let content = format!("[#{}] {}", story.id, story.name);
+                    
+                    // Check if story is owned by current user
+                    let is_owned = app.current_user_id.as_ref()
+                        .map(|uid| story.owner_ids.contains(uid))
+                        .unwrap_or(false);
+                    
                     let style = if is_selected_column && story_idx == app.selected_row {
                         Style::default()
                             .bg(Color::DarkGray)
-                            .fg(Color::White)
+                            .fg(if is_owned { Color::Cyan } else { Color::White })
                             .add_modifier(Modifier::BOLD)
+                    } else if is_owned {
+                        // Owned stories show in cyan
+                        Style::default().fg(Color::Cyan)
                     } else {
                         Style::default().fg(Color::White)
                     };

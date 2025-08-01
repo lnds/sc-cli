@@ -63,6 +63,7 @@ mod tests {
 
         // Check story list contains our story
         assert!(buffer_str.contains("[#123]"));
+        assert!(buffer_str.contains("✨")); // Feature type icon
         assert!(buffer_str.contains("Test Story"));
 
         // Check footer is rendered - at least parts of it should be visible
@@ -153,7 +154,7 @@ mod tests {
                 description: "".to_string(),
                 workflow_state_id: 10,
                 app_url: "".to_string(),
-                story_type: "".to_string(),
+                story_type: "bug".to_string(),
                 labels: vec![],
                 owner_ids: vec![],
                 position: 1000,
@@ -166,7 +167,7 @@ mod tests {
                 description: "".to_string(),
                 workflow_state_id: 20,
                 app_url: "".to_string(),
-                story_type: "".to_string(),
+                story_type: "chore".to_string(),
                 labels: vec![],
                 owner_ids: vec![],
                 position: 1000,
@@ -216,9 +217,87 @@ mod tests {
         
         // Check both stories are rendered
         assert!(buffer_str.contains("[#1]"));
+        assert!(buffer_str.contains("🐛")); // Bug type icon
         assert!(buffer_str.contains("First Story"));
         assert!(buffer_str.contains("[#2]"));
+        assert!(buffer_str.contains("🔧")); // Chore type icon
         assert!(buffer_str.contains("Second Story"));
+    }
+
+    #[test]
+    fn test_render_long_story_name_wrapping() {
+        let stories = vec![
+            Story {
+                id: 1,
+                name: "ThisIsAVeryLongStoryNameWithNoSpacesThatExceedsTheAvailableWidthForTheFirstLine".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10,
+                app_url: "".to_string(),
+                story_type: "feature".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 1000,
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+            },
+            Story {
+                id: 2,
+                name: "This is a normal story name that should wrap properly at word boundaries".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10,
+                app_url: "".to_string(),
+                story_type: "bug".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 2000,
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+            },
+        ];
+
+        let workflows = vec![
+            Workflow {
+                id: 1,
+                name: "Default Workflow".to_string(),
+                states: vec![
+                    WorkflowState {
+                        id: 10,
+                        name: "To Do".to_string(),
+                        color: "#000000".to_string(),
+                        position: 1,
+                    },
+                ],
+            },
+        ];
+        
+        let app = App::new(stories, workflows);
+
+        let backend = TestBackend::new(80, 24);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal.draw(|f| draw(f, &app)).unwrap();
+
+        let buffer = terminal.backend().buffer();
+        
+        // Convert buffer to string for easier testing
+        let mut buffer_str = String::new();
+        for y in 0..buffer.area().height {
+            for x in 0..buffer.area().width {
+                if let Some(cell) = buffer.cell((x, y)) {
+                    buffer_str.push_str(cell.symbol());
+                }
+            }
+            buffer_str.push('\n');
+        }
+        
+        // Check that the long story name appears on the second line
+        assert!(buffer_str.contains("[#1] ✨"));
+        // The long name should appear somewhere in the buffer (might be truncated)
+        assert!(buffer_str.contains("ThisIsAVeryLongStoryName"));
+        
+        // Check that the normal story wraps properly
+        assert!(buffer_str.contains("[#2] 🐛"));
+        assert!(buffer_str.contains("This is a normal story name"));
     }
 
     #[test]
@@ -230,7 +309,7 @@ mod tests {
                 description: "".to_string(),
                 workflow_state_id: 10,
                 app_url: "".to_string(),
-                story_type: "".to_string(),
+                story_type: "feature".to_string(),
                 labels: vec![],
                 owner_ids: vec!["current-user".to_string()],
                 position: 1000,
@@ -243,7 +322,7 @@ mod tests {
                 description: "".to_string(),
                 workflow_state_id: 10,
                 app_url: "".to_string(),
-                story_type: "".to_string(),
+                story_type: "bug".to_string(),
                 labels: vec![],
                 owner_ids: vec!["another-user".to_string()],
                 position: 2000,
@@ -288,11 +367,11 @@ mod tests {
                 if let Some(cell) = buffer.cell((x, y)) {
                     line.push_str(cell.symbol());
                     
-                    // Check color of cells containing story names
-                    if line.contains("[#1] My Story") && owned_story_color.is_none() {
+                    // Check color of cells containing story names (now on second line)
+                    if line.contains("My Story") && owned_story_color.is_none() {
                         owned_story_color = Some(cell.style().fg);
                     }
-                    if line.contains("[#2] Other Story") && other_story_color.is_none() {
+                    if line.contains("Other Story") && other_story_color.is_none() {
                         other_story_color = Some(cell.style().fg);
                     }
                 }

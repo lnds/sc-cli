@@ -61,6 +61,11 @@ pub struct StoriesData {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Member {
     pub id: String,
+    pub profile: MemberProfile,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberProfile {
     pub name: String,
     pub mention_name: String,
 }

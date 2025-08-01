@@ -12,7 +12,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::io;
+use std::{io, collections::HashMap};
 use ui::App;
 
 #[derive(Parser, Debug)]
@@ -155,30 +155,56 @@ fn main() -> Result<()> {
         eprintln!("Displaying {} stories", stories.len());
     }
 
-    // Setup terminal
-    setup_terminal()?;
-
-    // Create app and populate member cache
-    let mut app = App::new(stories, workflows);
-    
-    // Fetch members to populate cache
+    // Fetch members to populate cache BEFORE setting up terminal
+    let mut member_cache = HashMap::new();
     if args.debug {
         eprintln!("Fetching members for cache...");
     }
     match client.get_members() {
         Ok(members) => {
+            if args.debug {
+                eprintln!("Fetched {} members from API", members.len());
+            }
             for member in members {
-                app.add_member_to_cache(member.id, member.name);
+                if args.debug {
+                    eprintln!("Caching member: id='{}', name='{}', mention_name='{}'", 
+                        member.id, member.profile.name, member.profile.mention_name);
+                }
+                // Store name with mention_name in parentheses
+                let display_name = format!("{} ({})", member.profile.name, member.profile.mention_name);
+                member_cache.insert(member.id, display_name);
             }
             if args.debug {
-                eprintln!("Cached {} members", app.member_cache.len());
+                eprintln!("Cached {} members", member_cache.len());
+                // Also show some story owner IDs for comparison
+                if !stories.is_empty() {
+                    eprintln!("Sample story owner IDs:");
+                    for story in stories.iter().take(3) {
+                        if !story.owner_ids.is_empty() {
+                            eprintln!("  Story {}: owner_ids={:?}", story.id, story.owner_ids);
+                        }
+                    }
+                }
             }
         }
         Err(e) => {
+            eprintln!("WARNING: Failed to fetch members for cache: {}", e);
             if args.debug {
-                eprintln!("Failed to fetch members for cache: {}", e);
+                eprintln!("Full error: {:?}", e);
             }
+            eprintln!("Owner names will be displayed as IDs");
         }
+    }
+    
+    // Setup terminal AFTER fetching members
+    setup_terminal()?;
+    
+    // Create app with stories and workflows
+    let mut app = App::new(stories, workflows);
+    
+    // Populate the member cache in the app
+    for (id, name) in member_cache {
+        app.add_member_to_cache(id, name);
     }
     
     let result = run_app(app, client);
@@ -250,7 +276,8 @@ fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
                 match client.get_current_member() {
                     Ok(member) => {
                         // Add member to cache if not already present
-                        app.add_member_to_cache(member.id.clone(), member.name.clone());
+                        let display_name = format!("{} ({})", member.profile.name, member.profile.mention_name);
+                        app.add_member_to_cache(member.id.clone(), display_name);
                         
                         // Update story ownership
                         match client.update_story(story_id, vec![member.id.clone()]) {

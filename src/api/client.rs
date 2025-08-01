@@ -132,4 +132,106 @@ impl ShortcutApi for ShortcutClient {
 
         Ok(updated_story)
     }
+
+    fn get_current_member(&self) -> Result<Member> {
+        let url = format!("{}/member", self.base_url);
+        
+        if self.debug {
+            eprintln!("Fetching current member...");
+        }
+        
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .context("Failed to send member request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Member response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to get current member: {}. Error: {}", status, error_text);
+        }
+
+        let member: Member = response
+            .json()
+            .context("Failed to parse member response")?;
+
+        Ok(member)
+    }
+
+    fn update_story(&self, story_id: i64, owner_ids: Vec<String>) -> Result<Story> {
+        let url = format!("{}/stories/{}", self.base_url, story_id);
+        
+        let update_payload = serde_json::json!({
+            "owner_ids": owner_ids
+        });
+
+        if self.debug {
+            eprintln!("Updating story {} owners to {:?}", story_id, owner_ids);
+        }
+        
+        let response = self
+            .client
+            .put(&url)
+            .headers(self.headers())
+            .json(&update_payload)
+            .send()
+            .context("Failed to send story update request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Update response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to update story owners: {}. Error: {}", status, error_text);
+        }
+
+        let updated_story: Story = response
+            .json()
+            .context("Failed to parse updated story response")?;
+
+        Ok(updated_story)
+    }
+
+    fn get_members(&self) -> Result<Vec<Member>> {
+        let url = format!("{}/members", self.base_url);
+        
+        if self.debug {
+            eprintln!("Fetching all members...");
+        }
+        
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .context("Failed to send members request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Members response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to get members: {}. Error: {}", status, error_text);
+        }
+
+        let members: Vec<Member> = response
+            .json()
+            .context("Failed to parse members response")?;
+
+        if self.debug {
+            eprintln!("Fetched {} members", members.len());
+        }
+
+        Ok(members)
+    }
 }

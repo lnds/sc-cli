@@ -104,6 +104,7 @@ user_id = "your.work.mention.name"
 - **→/l** - Move to next column (workflow state)
 - **Enter** - View story details
 - **Space** - Move story to a different workflow state
+- **o** - Take ownership of the selected story
 - **Esc** - Close detail view or cancel state selection
 - **q** - Quit the application
 
@@ -116,6 +117,14 @@ When you press **Space** on a selected story:
 4. Press **Esc** to cancel without making changes
 
 The story will be immediately updated in Shortcut and moved to the appropriate column in the UI.
+
+#### Taking Ownership of Stories
+
+When you press **o** on a selected story:
+- The story ownership will be immediately updated to assign you as the owner
+- This uses the API token's associated user account
+- The story display will refresh to show the updated ownership
+- This is useful for quickly claiming unassigned stories or taking over stories from other team members
 
 ### Examples
 
@@ -183,6 +192,7 @@ The TUI shows:
   - Name
   - Type
   - Workflow State
+  - Owners (shows owner names or "Unassigned")
   - Description
   - Shortcut URL
 - State selector dialog for moving stories between workflow states

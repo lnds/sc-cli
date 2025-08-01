@@ -17,6 +17,7 @@ mod tests {
                 story_type: "feature".to_string(),
                 labels: vec![],
                 owner_ids: vec!["user1".to_string()],
+                position: 1000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
             },
@@ -29,6 +30,7 @@ mod tests {
                 story_type: "bug".to_string(),
                 labels: vec![],
                 owner_ids: vec!["user2".to_string()],
+                position: 2000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
             },
@@ -41,6 +43,7 @@ mod tests {
                 story_type: "chore".to_string(),
                 labels: vec![],
                 owner_ids: vec!["user3".to_string()],
+                position: 3000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
             },
@@ -222,6 +225,71 @@ mod tests {
         // Change current user
         app.set_current_user_id("user2".to_string());
         assert_eq!(app.current_user_id, Some("user2".to_string()));
+    }
+
+    #[test]
+    fn test_stories_sorted_by_position() {
+        let stories = vec![
+            Story {
+                id: 3,
+                name: "Third Story".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10,
+                app_url: "".to_string(),
+                story_type: "".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 3000, // Higher position
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+            },
+            Story {
+                id: 1,
+                name: "First Story".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10,
+                app_url: "".to_string(),
+                story_type: "".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 1000, // Lower position (should come first)
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+            },
+            Story {
+                id: 2,
+                name: "Second Story".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10,
+                app_url: "".to_string(),
+                story_type: "".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 2000, // Middle position
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+            },
+        ];
+        
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Default Workflow".to_string(),
+            states: vec![WorkflowState {
+                id: 10,
+                name: "To Do".to_string(),
+                color: "#000000".to_string(),
+                position: 1,
+            }],
+        }];
+        
+        let app = App::new(stories, workflows);
+        
+        // Check that stories are sorted by position
+        let sorted_stories = app.stories_by_state.get(&10).unwrap();
+        assert_eq!(sorted_stories.len(), 3);
+        assert_eq!(sorted_stories[0].id, 1); // First by position
+        assert_eq!(sorted_stories[1].id, 2); // Second by position
+        assert_eq!(sorted_stories[2].id, 3); // Third by position
     }
 
     // Note: Event handling tests would require mocking crossterm events

@@ -16,6 +16,7 @@ mod tests {
             story_type: "feature".to_string(),
             labels: vec![],
             owner_ids: vec!["user1".to_string()],
+            position: id * 1000, // Use id to generate position
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-02T00:00:00Z".to_string(),
         }

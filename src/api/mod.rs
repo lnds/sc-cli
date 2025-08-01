@@ -20,6 +20,7 @@ pub struct Story {
     pub labels: Vec<Label>,
     #[serde(default)]
     pub owner_ids: Vec<String>,
+    pub position: i64,
     pub created_at: String,
     pub updated_at: String,
 }

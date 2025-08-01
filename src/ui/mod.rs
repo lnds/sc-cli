@@ -38,6 +38,11 @@ impl App {
                 .push(story.clone());
         }
         
+        // Sort stories within each state by position
+        for stories in stories_by_state.values_mut() {
+            stories.sort_by_key(|s| s.position);
+        }
+        
         // Create workflow state map for quick lookups
         let mut workflow_state_map = HashMap::new();
         let mut state_positions: HashMap<i64, i64> = HashMap::new();

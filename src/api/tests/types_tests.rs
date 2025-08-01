@@ -19,6 +19,7 @@ mod tests {
                 {"id": 1, "name": "backend", "color": "#ff0000"}
             ],
             "owner_ids": ["user-123"],
+            "position": 1000,
             "created_at": "2024-01-01T00:00:00Z",
             "updated_at": "2024-01-02T00:00:00Z"
         });
@@ -43,6 +44,7 @@ mod tests {
             "name": "Minimal Story",
             "workflow_state_id": 456,
             "app_url": "https://app.shortcut.com/org/story/123",
+            "position": 2000,
             "created_at": "2024-01-01T00:00:00Z",
             "updated_at": "2024-01-02T00:00:00Z"
         });
@@ -92,6 +94,7 @@ mod tests {
                         "name": "Story 1",
                         "workflow_state_id": 10,
                         "app_url": "https://app.shortcut.com/org/story/1",
+                        "position": 1000,
                         "created_at": "2024-01-01T00:00:00Z",
                         "updated_at": "2024-01-02T00:00:00Z"
                     },
@@ -100,6 +103,7 @@ mod tests {
                         "name": "Story 2",
                         "workflow_state_id": 20,
                         "app_url": "https://app.shortcut.com/org/story/2",
+                        "position": 2000,
                         "created_at": "2024-01-01T00:00:00Z",
                         "updated_at": "2024-01-02T00:00:00Z"
                     }

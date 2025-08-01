@@ -387,7 +387,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
                                         }
                                     } else {
                                         // Already on second line
-                                        if current_length + word_len < second_line_width {
+                                       if current_length + word_len < second_line_width {
                                             line2_text.push(' ');
                                             line2_text.push_str(word);
                                             current_length += word_len + 1;

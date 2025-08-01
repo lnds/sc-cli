@@ -16,7 +16,9 @@ pub struct App {
     pub show_detail: bool,
     pub show_state_selector: bool,
     pub state_selector_index: usize,
+    pub take_ownership_requested: bool,
     pub workflow_state_map: HashMap<i64, String>,
+    pub member_cache: HashMap<String, String>, // owner_id -> name
     pub should_quit: bool,
     pub selected_column: usize,
     pub selected_row: usize,
@@ -61,7 +63,9 @@ impl App {
             show_detail: false,
             show_state_selector: false,
             state_selector_index: 0,
+            take_ownership_requested: false,
             workflow_state_map,
+            member_cache: HashMap::new(),
             should_quit: false,
             selected_column: 0,
             selected_row: 0,
@@ -212,11 +216,30 @@ impl App {
                 KeyCode::Char('h') | KeyCode::Left => self.previous_column(),
                 KeyCode::Enter => self.toggle_detail(),
                 KeyCode::Char(' ') => self.toggle_state_selector(),
+                KeyCode::Char('o') => {
+                    if self.get_selected_story().is_some() {
+                        self.take_ownership_requested = true;
+                    }
+                }
                 KeyCode::Esc if self.show_detail => self.show_detail = false,
                 _ => {}
             }
         }
         Ok(())
+    }
+
+    pub fn get_owner_names(&self, owner_ids: &[String]) -> Vec<String> {
+        owner_ids.iter()
+            .map(|id| {
+                self.member_cache.get(id)
+                    .cloned()
+                    .unwrap_or_else(|| id.clone())
+            })
+            .collect()
+    }
+
+    pub fn add_member_to_cache(&mut self, member_id: String, member_name: String) {
+        self.member_cache.insert(member_id, member_name);
     }
 }
 
@@ -305,7 +328,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     } else if app.show_detail {
         "Press [Esc] to close detail | [q] to quit"
     } else {
-        "[←/h] [→/l] switch columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [q] quit"
+        "[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [q] quit"
     };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(Color::DarkGray))
@@ -316,7 +339,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     // Detail popup
     if app.show_detail {
         if let Some(story) = app.get_selected_story() {
-            draw_detail_popup(frame, story, &app.workflow_state_map);
+            draw_detail_popup(frame, story, app);
         }
     }
 
@@ -328,11 +351,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
 }
 
-fn draw_detail_popup(frame: &mut Frame, story: &Story, workflow_map: &HashMap<i64, String>) {
+fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
     let area = centered_rect(80, 80, frame.area());
     frame.render_widget(Clear, area);
 
-    let workflow_state = workflow_map
+    let workflow_state = app.workflow_state_map
         .get(&story.workflow_state_id)
         .map(|s| s.as_str())
         .unwrap_or("Unknown");
@@ -358,10 +381,26 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, workflow_map: &HashMap<i6
             Span::raw(workflow_state),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("Description:", Style::default().add_modifier(Modifier::BOLD)),
-        ]),
     ];
+
+    // Add owners information
+    if !story.owner_ids.is_empty() {
+        let owner_names = app.get_owner_names(&story.owner_ids);
+        text_lines.push(Line::from(vec![
+            Span::styled("Owners: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(owner_names.join(", ")),
+        ]));
+    } else {
+        text_lines.push(Line::from(vec![
+            Span::styled("Owners: ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("Unassigned"),
+        ]));
+    }
+    
+    text_lines.push(Line::from(""));
+    text_lines.push(Line::from(vec![
+        Span::styled("Description:", Style::default().add_modifier(Modifier::BOLD)),
+    ]));
 
     // Add description lines
     if !story.description.is_empty() {

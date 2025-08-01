@@ -158,8 +158,29 @@ fn main() -> Result<()> {
     // Setup terminal
     setup_terminal()?;
 
-    // Run app
-    let app = App::new(stories, workflows);
+    // Create app and populate member cache
+    let mut app = App::new(stories, workflows);
+    
+    // Fetch members to populate cache
+    if args.debug {
+        eprintln!("Fetching members for cache...");
+    }
+    match client.get_members() {
+        Ok(members) => {
+            for member in members {
+                app.add_member_to_cache(member.id, member.name);
+            }
+            if args.debug {
+                eprintln!("Cached {} members", app.member_cache.len());
+            }
+        }
+        Err(e) => {
+            if args.debug {
+                eprintln!("Failed to fetch members for cache: {}", e);
+            }
+        }
+    }
+    
     let result = run_app(app, client);
 
     // Restore terminal
@@ -220,6 +241,36 @@ fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
             }
         }
 
+        // Check if we need to handle ownership change
+        if app.take_ownership_requested {
+            let story_id = app.get_selected_story().map(|s| s.id);
+            
+            if let Some(story_id) = story_id {
+                // Get current member info
+                match client.get_current_member() {
+                    Ok(member) => {
+                        // Add member to cache if not already present
+                        app.add_member_to_cache(member.id.clone(), member.name.clone());
+                        
+                        // Update story ownership
+                        match client.update_story(story_id, vec![member.id.clone()]) {
+                            Ok(updated_story) => {
+                                // Update the story in our local data
+                                update_story_ownership(&mut app, story_id, updated_story);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to update story ownership: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to get current member: {}", e);
+                    }
+                }
+            }
+            app.take_ownership_requested = false;
+        }
+
         if app.should_quit {
             break;
         }
@@ -253,6 +304,16 @@ fn update_story_state(app: &mut App, story_id: i64, updated_story: api::Story) {
                     app.selected_row = 0;
                 }
             }
+        }
+    }
+}
+
+fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Story) {
+    // Find and update the story in its current state
+    let state_id = updated_story.workflow_state_id;
+    if let Some(stories) = app.stories_by_state.get_mut(&state_id) {
+        if let Some(pos) = stories.iter().position(|s| s.id == story_id) {
+            stories[pos] = updated_story;
         }
     }
 }

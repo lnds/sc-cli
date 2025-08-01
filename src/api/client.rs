@@ -48,7 +48,7 @@ impl ShortcutApi for ShortcutClient {
         if self.debug {
             eprintln!("Searching with query: {query}");
             if let Some(l) = limit {
-                eprintln!("Limit: {}", l);
+                eprintln!("Limit: {l}");
             }
         }
         
@@ -87,9 +87,9 @@ impl ShortcutApi for ShortcutClient {
 
             let stories_count = search_response.stories.data.len();
             if self.debug {
-                eprintln!("Found {} stories in this page", stories_count);
+                eprintln!("Found {stories_count} stories in this page");
                 if let Some(total) = search_response.stories.total {
-                    eprintln!("Total available stories: {}", total);
+                    eprintln!("Total available stories: {total}");
                 }
             }
             
@@ -147,7 +147,7 @@ impl ShortcutApi for ShortcutClient {
         });
 
         if self.debug {
-            eprintln!("Updating story {} to workflow state {}", story_id, workflow_state_id);
+            eprintln!("Updating story {story_id} to workflow state {workflow_state_id}");
         }
         
         let response = self
@@ -214,7 +214,7 @@ impl ShortcutApi for ShortcutClient {
         });
 
         if self.debug {
-            eprintln!("Updating story {} owners to {:?}", story_id, owner_ids);
+            eprintln!("Updating story {story_id} owners to {owner_ids:?}");
         }
         
         let response = self

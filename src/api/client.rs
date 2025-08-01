@@ -1,6 +1,7 @@
 use super::*;
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
+use super::CurrentMember;
 
 pub struct ShortcutClient {
     pub(crate) client: Client,
@@ -133,7 +134,7 @@ impl ShortcutApi for ShortcutClient {
         Ok(updated_story)
     }
 
-    fn get_current_member(&self) -> Result<Member> {
+    fn get_current_member(&self) -> Result<CurrentMember> {
         let url = format!("{}/member", self.base_url);
         
         if self.debug {
@@ -157,7 +158,7 @@ impl ShortcutApi for ShortcutClient {
             anyhow::bail!("Failed to get current member: {}. Error: {}", status, error_text);
         }
 
-        let member: Member = response
+        let member: CurrentMember = response
             .json()
             .context("Failed to parse member response")?;
 

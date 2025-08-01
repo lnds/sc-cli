@@ -70,11 +70,19 @@ pub struct MemberProfile {
     pub mention_name: String,
 }
 
+// Structure for the /member endpoint (current user)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurrentMember {
+    pub id: String,
+    pub name: String,
+    pub mention_name: String,
+}
+
 pub trait ShortcutApi {
     fn search_stories(&self, query: &str) -> Result<Vec<Story>>;
     fn get_workflows(&self) -> Result<Vec<Workflow>>;
     fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story>;
-    fn get_current_member(&self) -> Result<Member>;
+    fn get_current_member(&self) -> Result<CurrentMember>;
     fn update_story(&self, story_id: i64, owner_ids: Vec<String>) -> Result<Story>;
     fn get_members(&self) -> Result<Vec<Member>>;
 }

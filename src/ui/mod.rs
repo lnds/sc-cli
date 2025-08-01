@@ -238,16 +238,16 @@ impl App {
     pub fn get_owner_names(&self, owner_ids: &[String]) -> Vec<String> {
         owner_ids.iter()
             .map(|id| {
-                let name = self.member_cache.get(id)
+                
+                self.member_cache.get(id)
                     .cloned()
                     .unwrap_or_else(|| {
                         // If debug mode, log cache miss
                         if std::env::var("RUST_LOG").is_ok() {
-                            eprintln!("Cache miss for owner ID: {}", id);
+                            eprintln!("Cache miss for owner ID: {id}");
                         }
                         id.clone()
-                    });
-                name
+                    })
             })
             .collect()
     }
@@ -387,7 +387,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
                                         }
                                     } else {
                                         // Already on second line
-                                        if current_length + word_len + 1 <= second_line_width {
+                                        if current_length + word_len < second_line_width {
                                             line2_text.push(' ');
                                             line2_text.push_str(word);
                                             current_length += word_len + 1;
@@ -562,7 +562,7 @@ fn draw_state_selector_popup(frame: &mut Frame, story: &Story, app: &App) {
         .iter()
         .enumerate()
         .map(|(idx, (_, state_name))| {
-            let content = format!(" {} ", state_name);
+            let content = format!(" {state_name} ");
             let style = if idx == app.state_selector_index {
                 Style::default()
                     .bg(Color::DarkGray)

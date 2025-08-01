@@ -54,7 +54,7 @@ impl Config {
                 } else {
                     // Ask if user wants to add this workspace
                     if Confirm::new()
-                        .with_prompt(format!("Workspace '{}' not found. Would you like to create it?", workspace_name))
+                        .with_prompt(format!("Workspace '{workspace_name}' not found. Would you like to create it?"))
                         .default(true)
                         .interact()? 
                     {

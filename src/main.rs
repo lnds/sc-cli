@@ -67,7 +67,7 @@ fn main() -> Result<()> {
         let (config, _created) = Config::load_or_create(&workspace_name)
             .context("Failed to load or create config")?;
         let workspace = config.get_workspace(&workspace_name)
-            .context(format!("Failed to get workspace '{}'", workspace_name))?;
+            .context(format!("Failed to get workspace '{workspace_name}'"))?;
         (workspace.api_key.clone(), workspace.user_id.clone(), workspace.fetch_limit)
     } else if args.token.is_none() && args.username.is_none() {
         // No args provided, try to use default workspace
@@ -75,7 +75,7 @@ fn main() -> Result<()> {
             Ok(config) => {
                 if let Some(default_workspace_name) = config.get_default_workspace() {
                     let workspace = config.get_workspace(&default_workspace_name)
-                        .context(format!("Failed to get default workspace '{}'", default_workspace_name))?;
+                        .context(format!("Failed to get default workspace '{default_workspace_name}'"))?;
                     (workspace.api_key.clone(), workspace.user_id.clone(), workspace.fetch_limit)
                 } else {
                     anyhow::bail!("No default workspace configured. Use --workspace to specify one or provide --token and username");
@@ -119,10 +119,10 @@ fn main() -> Result<()> {
         if args.all {
             // No user filter for --all flag
         } else if args.requester {
-            query_parts.push(format!("requester:{}", username));
+            query_parts.push(format!("requester:{username}"));
         } else {
             // Default to owner filter (also when --owner is explicitly used)
-            query_parts.push(format!("owner:{}", username));
+            query_parts.push(format!("owner:{username}"));
         }
         
         if let Some(story_type) = args.story_type {
@@ -185,9 +185,9 @@ fn main() -> Result<()> {
             }
         }
         Err(e) => {
-            eprintln!("WARNING: Failed to fetch members for cache: {}", e);
+            eprintln!("WARNING: Failed to fetch members for cache: {e}");
             if args.debug {
-                eprintln!("Full error: {:?}", e);
+                eprintln!("Full error: {e:?}");
             }
             eprintln!("Owner names will be displayed as IDs");
         }
@@ -217,7 +217,7 @@ fn main() -> Result<()> {
         }
         Err(e) => {
             if args.debug {
-                eprintln!("Failed to get current user for highlighting: {}", e);
+                eprintln!("Failed to get current user for highlighting: {e}");
                 eprintln!("Owned stories will not be highlighted");
             }
         }
@@ -269,7 +269,7 @@ fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
                                     update_story_state(&mut app, story_id, updated_story);
                                 }
                                 Err(e) => {
-                                    eprintln!("Failed to update story state: {}", e);
+                                    eprintln!("Failed to update story state: {e}");
                                 }
                             }
                         }
@@ -302,12 +302,12 @@ fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
                                 update_story_ownership(&mut app, story_id, updated_story);
                             }
                             Err(e) => {
-                                eprintln!("Failed to update story ownership: {}", e);
+                                eprintln!("Failed to update story ownership: {e}");
                             }
                         }
                     }
                     Err(e) => {
-                        eprintln!("Failed to get current member: {}", e);
+                        eprintln!("Failed to get current member: {e}");
                     }
                 }
             }

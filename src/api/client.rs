@@ -39,42 +39,83 @@ impl ShortcutClient {
 }
 
 impl ShortcutApi for ShortcutClient {
-    fn search_stories(&self, query: &str) -> Result<Vec<Story>> {
+    fn search_stories(&self, query: &str, limit: Option<usize>) -> Result<Vec<Story>> {
         let url = format!("{}/search", self.base_url);
+        let mut all_stories = Vec::new();
+        let page_size = 25; // Maximum allowed by Shortcut API
+        let mut next_token: Option<String> = None;
+        
         if self.debug {
             eprintln!("Searching with query: {query}");
+            if let Some(l) = limit {
+                eprintln!("Limit: {}", l);
+            }
         }
         
-        let response = self
-            .client
-            .get(&url)
-            .headers(self.headers())
-            .query(&[("query", query)])
-            .send()
-            .context("Failed to send search request")?;
+        loop {
+            // Build query parameters
+            let mut params = vec![("query", query.to_string()), ("page_size", page_size.to_string())];
+            if let Some(ref token) = next_token {
+                params.push(("next", token.clone()));
+            }
+            
+            let response = self
+                .client
+                .get(&url)
+                .headers(self.headers())
+                .query(&params)
+                .send()
+                .context("Failed to send search request")?;
 
-        let status = response.status();
-        if self.debug {
-            eprintln!("Response status: {status}");
+            let status = response.status();
+            if self.debug {
+                eprintln!("Response status: {status}");
+            }
+            
+            if !status.is_success() {
+                let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+                anyhow::bail!("API request failed with status: {}. Error: {}", status, error_text);
+            }
+
+            let response_text = response.text().context("Failed to read response text")?;
+            if self.debug && next_token.is_none() {
+                eprintln!("Response preview: {}", &response_text.chars().take(500).collect::<String>());
+            }
+            
+            let search_response: SearchResponse = serde_json::from_str(&response_text)
+                .context("Failed to parse search response")?;
+
+            let stories_count = search_response.stories.data.len();
+            if self.debug {
+                eprintln!("Found {} stories in this page", stories_count);
+                if let Some(total) = search_response.stories.total {
+                    eprintln!("Total available stories: {}", total);
+                }
+            }
+            
+            all_stories.extend(search_response.stories.data);
+            
+            // Check if we have enough stories
+            if let Some(l) = limit {
+                if all_stories.len() >= l {
+                    all_stories.truncate(l);
+                    break;
+                }
+            }
+            
+            // Check if we have a next page
+            next_token = search_response.next.or(search_response.stories.next);
+            
+            if next_token.is_none() || stories_count == 0 {
+                break;
+            }
         }
         
-        if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("API request failed with status: {}. Error: {}", status, error_text);
-        }
-
-        let response_text = response.text().context("Failed to read response text")?;
         if self.debug {
-            eprintln!("Response preview: {}", &response_text.chars().take(200).collect::<String>());
+            eprintln!("Total stories fetched: {}", all_stories.len());
         }
         
-        let search_response: SearchResponse = serde_json::from_str(&response_text)
-            .context("Failed to parse search response")?;
-
-        if self.debug {
-            eprintln!("Found {} stories", search_response.stories.data.len());
-        }
-        Ok(search_response.stories.data)
+        Ok(all_stories)
     }
 
     fn get_workflows(&self) -> Result<Vec<Workflow>> {

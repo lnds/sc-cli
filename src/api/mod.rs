@@ -52,11 +52,17 @@ pub struct WorkflowState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResponse {
     pub stories: StoriesData,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoriesData {
     pub data: Vec<Story>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,7 +86,7 @@ pub struct CurrentMember {
 }
 
 pub trait ShortcutApi {
-    fn search_stories(&self, query: &str) -> Result<Vec<Story>>;
+    fn search_stories(&self, query: &str, limit: Option<usize>) -> Result<Vec<Story>>;
     fn get_workflows(&self) -> Result<Vec<Workflow>>;
     fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story>;
     fn get_current_member(&self) -> Result<CurrentMember>;

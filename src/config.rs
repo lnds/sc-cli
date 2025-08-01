@@ -18,6 +18,12 @@ pub struct Config {
 pub struct WorkspaceConfig {
     pub api_key: String,
     pub user_id: String,
+    #[serde(default = "default_fetch_limit")]
+    pub fetch_limit: usize,
+}
+
+fn default_fetch_limit() -> usize {
+    20
 }
 
 impl Config {
@@ -110,8 +116,13 @@ impl Config {
         let user_id: String = Input::new()
             .with_prompt("Enter your Shortcut mention name")
             .interact_text()?;
+        
+        let fetch_limit: usize = Input::new()
+            .with_prompt("Enter the default number of stories to fetch")
+            .default(20)
+            .interact_text()?;
             
-        Ok(WorkspaceConfig { api_key, user_id })
+        Ok(WorkspaceConfig { api_key, user_id, fetch_limit })
     }
     
     fn prompt_for_config_location() -> Result<PathBuf> {
@@ -240,16 +251,19 @@ default_workspace = "personal"
 [personal]
 api_key = "your-personal-api-key"
 user_id = "your-mention-name"
+fetch_limit = 20  # Optional: defaults to 20 if not specified
 
 # Configuration for 'work' workspace  
 [work]
 api_key = "your-work-api-key"
 user_id = "your-work-mention-name"
+fetch_limit = 50  # Fetch more stories for work workspace
 
 # Configuration for 'client' workspace
 [client]
 api_key = "your-client-api-key"
 user_id = "your-client-mention-name"
+# fetch_limit not specified, will use default of 20
 "#.to_string()
     }
 }
@@ -266,6 +280,7 @@ workspaces = ["test", "prod"]
 [test]
 api_key = "test-key"
 user_id = "test.user"
+fetch_limit = 30
 
 [prod]
 api_key = "prod-key"
@@ -281,10 +296,12 @@ user_id = "prod.user"
         let test_workspace = config.get_workspace("test").unwrap();
         assert_eq!(test_workspace.api_key, "test-key");
         assert_eq!(test_workspace.user_id, "test.user");
+        assert_eq!(test_workspace.fetch_limit, 30); // Explicitly set
         
         let prod_workspace = config.get_workspace("prod").unwrap();
         assert_eq!(prod_workspace.api_key, "prod-key");
         assert_eq!(prod_workspace.user_id, "prod.user");
+        assert_eq!(prod_workspace.fetch_limit, 20); // Default value
     }
     
     #[test]
@@ -376,5 +393,46 @@ user_id = "test.user"
         
         // Should fallback to single workspace when default is invalid
         assert_eq!(config.get_default_workspace(), Some("test".to_string()));
+    }
+    
+    #[test]
+    fn test_fetch_limit_various_scenarios() {
+        // Test with explicit fetch_limit
+        let config_content = r#"
+workspaces = ["workspace1"]
+
+[workspace1]
+api_key = "key1"
+user_id = "user1"
+fetch_limit = 100
+"#;
+        let config: Config = toml::from_str(config_content).unwrap();
+        let workspace = config.get_workspace("workspace1").unwrap();
+        assert_eq!(workspace.fetch_limit, 100);
+        
+        // Test without fetch_limit (should use default)
+        let config_content = r#"
+workspaces = ["workspace2"]
+
+[workspace2]
+api_key = "key2"
+user_id = "user2"
+"#;
+        let config: Config = toml::from_str(config_content).unwrap();
+        let workspace = config.get_workspace("workspace2").unwrap();
+        assert_eq!(workspace.fetch_limit, 20);
+        
+        // Test with zero fetch_limit
+        let config_content = r#"
+workspaces = ["workspace3"]
+
+[workspace3]
+api_key = "key3"
+user_id = "user3"
+fetch_limit = 0
+"#;
+        let config: Config = toml::from_str(config_content).unwrap();
+        let workspace = config.get_workspace("workspace3").unwrap();
+        assert_eq!(workspace.fetch_limit, 0);
     }
 }

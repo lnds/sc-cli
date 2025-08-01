@@ -29,9 +29,9 @@ struct Args {
     #[arg(short, long)]
     workspace: Option<String>,
 
-    /// Maximum number of stories to display
-    #[arg(short, long, default_value_t = 25)]
-    limit: usize,
+    /// Maximum number of stories to display (overrides workspace config)
+    #[arg(short, long)]
+    limit: Option<usize>,
 
     /// Filter by story type (feature, bug, chore)
     #[arg(long)]
@@ -61,14 +61,14 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    // Get token and username from args or config
-    let (token, username) = if let Some(workspace_name) = args.workspace {
+    // Get token, username, and fetch_limit from args or config
+    let (token, username, config_limit) = if let Some(workspace_name) = args.workspace {
         // Use explicitly specified workspace
         let (config, _created) = Config::load_or_create(&workspace_name)
             .context("Failed to load or create config")?;
         let workspace = config.get_workspace(&workspace_name)
             .context(format!("Failed to get workspace '{}'", workspace_name))?;
-        (workspace.api_key.clone(), workspace.user_id.clone())
+        (workspace.api_key.clone(), workspace.user_id.clone(), workspace.fetch_limit)
     } else if args.token.is_none() && args.username.is_none() {
         // No args provided, try to use default workspace
         match Config::load() {
@@ -76,7 +76,7 @@ fn main() -> Result<()> {
                 if let Some(default_workspace_name) = config.get_default_workspace() {
                     let workspace = config.get_workspace(&default_workspace_name)
                         .context(format!("Failed to get default workspace '{}'", default_workspace_name))?;
-                    (workspace.api_key.clone(), workspace.user_id.clone())
+                    (workspace.api_key.clone(), workspace.user_id.clone(), workspace.fetch_limit)
                 } else {
                     anyhow::bail!("No default workspace configured. Use --workspace to specify one or provide --token and username");
                 }
@@ -86,13 +86,16 @@ fn main() -> Result<()> {
             }
         }
     } else {
-        // Use command line arguments
+        // Use command line arguments with default limit
         let token = args.token
             .ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?;
         let username = args.username
             .ok_or_else(|| anyhow::anyhow!("Either username or --workspace must be provided"))?;
-        (token, username)
+        (token, username, 20) // Default limit when not using workspace
     };
+    
+    // Use command-line limit if provided, otherwise use workspace config limit
+    let limit = args.limit.unwrap_or(config_limit);
 
     // Initialize API client
     let client = ShortcutClient::new(token, args.debug)
@@ -135,8 +138,8 @@ fn main() -> Result<()> {
         eprintln!("Searching for stories...");
         eprintln!("Query: {query}");
     }
-    let mut stories = client
-        .search_stories(&query)
+    let stories = client
+        .search_stories(&query, Some(limit))
         .context("Failed to search stories")?;
 
     if stories.is_empty() {
@@ -147,12 +150,6 @@ fn main() -> Result<()> {
 
     if args.debug {
         eprintln!("Found {} stories", stories.len());
-    }
-    
-    // Limit results
-    stories.truncate(args.limit);
-    if args.debug {
-        eprintln!("Displaying {} stories", stories.len());
     }
 
     // Fetch members to populate cache BEFORE setting up terminal

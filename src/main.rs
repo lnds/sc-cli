@@ -41,6 +41,18 @@ struct Args {
     #[arg(short, long)]
     search: Option<String>,
 
+    /// Show all stories (no owner/requester filter)
+    #[arg(long, conflicts_with_all = ["owner", "requester"])]
+    all: bool,
+
+    /// Show stories where user is the owner (default)
+    #[arg(long, conflicts_with_all = ["all", "requester"])]
+    owner: bool,
+
+    /// Show stories where user is the requester
+    #[arg(long, conflicts_with_all = ["all", "owner"])]
+    requester: bool,
+
     /// Enable debug output
     #[arg(short, long)]
     debug: bool,
@@ -98,8 +110,17 @@ fn main() -> Result<()> {
     let query = if let Some(search) = args.search {
         search
     } else {
-        // Search for stories where user is either owner or requester
-        let mut query_parts = vec![format!("(owner:{} OR requester:{})", username, username)];
+        let mut query_parts = vec![];
+        
+        // Apply filter based on flags (default to owner if none specified)
+        if args.all {
+            // No user filter for --all flag
+        } else if args.requester {
+            query_parts.push(format!("requester:{}", username));
+        } else {
+            // Default to owner filter (also when --owner is explicitly used)
+            query_parts.push(format!("owner:{}", username));
+        }
         
         if let Some(story_type) = args.story_type {
             query_parts.push(format!("type:{story_type}"));

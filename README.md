@@ -130,6 +130,12 @@ cargo run -- -w work
 # With options
 cargo run -- john.doe --token YOUR_API_TOKEN --limit 20 --story-type feature
 
+# Show stories where you are the requester
+cargo run -- --workspace work --requester
+
+# Show all stories (no user filter)
+cargo run -- --workspace work --all
+
 # Custom search (overrides default filters)
 cargo run -- --workspace work --search "state:done updated:\"last week\""
 
@@ -145,15 +151,19 @@ cargo run -- -w personal --debug
 - `--limit` (optional) - Maximum number of stories to display (default: 25)
 - `--story-type` (optional) - Filter by story type: feature, bug, chore
 - `--search` (optional) - Custom search query using Shortcut's search syntax
+- `--all` (optional) - Show all stories (no owner/requester filter)
+- `--owner` (optional) - Show stories where user is the owner (default behavior)
+- `--requester` (optional) - Show stories where user is the requester
 - `--debug` (optional) - Enable debug output for troubleshooting
+
+Note: The `--all`, `--owner`, and `--requester` flags are mutually exclusive. Only one can be used at a time.
 
 ### Search Syntax
 
-The application supports Shortcut's search syntax. By default, it searches for stories where the user is either the owner OR the requester. You can use custom queries with the `--search` option:
+The application supports Shortcut's search syntax. By default, it searches for stories where the user is the owner. You can use custom queries with the `--search` option:
 
-- `owner:<username>` - Stories owned by the user only
-- `requester:<username>` - Stories requested by the user only
-- `(owner:<username> OR requester:<username>)` - Stories owned or requested by the user (default)
+- `owner:<username>` - Stories owned by the user (default behavior)
+- `requester:<username>` - Stories requested by the user
 - `state:started` - Stories in started state
 - `state:"in progress"` - Stories in progress (use quotes for multi-word states)
 - `updated:"last week"` - Recently updated stories

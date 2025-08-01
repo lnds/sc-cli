@@ -19,7 +19,10 @@ fn test_cli_help() {
         .stdout(predicate::str::contains("--token"))
         .stdout(predicate::str::contains("--workspace"))
         .stdout(predicate::str::contains("--limit"))
-        .stdout(predicate::str::contains("--debug"));
+        .stdout(predicate::str::contains("--debug"))
+        .stdout(predicate::str::contains("--all"))
+        .stdout(predicate::str::contains("--owner"))
+        .stdout(predicate::str::contains("--requester"));
 }
 
 #[test]

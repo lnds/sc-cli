@@ -123,10 +123,11 @@ cargo run -- -w personal --debug
 
 ### Search Syntax
 
-The application supports Shortcut's search syntax. By default, it searches for `owner:<username>`. You can use custom queries with the `--search` option:
+The application supports Shortcut's search syntax. By default, it searches for stories where the user is either the owner OR the requester. You can use custom queries with the `--search` option:
 
-- `owner:<username>` - Stories owned by the user (default)
-- `requester:<username>` - Stories requested by the user
+- `owner:<username>` - Stories owned by the user only
+- `requester:<username>` - Stories requested by the user only
+- `(owner:<username> OR requester:<username>)` - Stories owned or requested by the user (default)
 - `state:started` - Stories in started state
 - `state:"in progress"` - Stories in progress (use quotes for multi-word states)
 - `updated:"last week"` - Recently updated stories

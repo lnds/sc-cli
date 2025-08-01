@@ -82,7 +82,8 @@ fn main() -> Result<()> {
     let query = if let Some(search) = args.search {
         search
     } else {
-        let mut query_parts = vec![format!("owner:{}", username)];
+        // Search for stories where user is either owner or requester
+        let mut query_parts = vec![format!("(owner:{} OR requester:{})", username, username)];
         
         if let Some(story_type) = args.story_type {
             query_parts.push(format!("type:{story_type}"));

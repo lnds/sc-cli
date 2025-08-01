@@ -276,7 +276,7 @@ fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
                 match client.get_current_member() {
                     Ok(member) => {
                         // Add member to cache if not already present
-                        let display_name = format!("{} ({})", member.profile.name, member.profile.mention_name);
+                        let display_name = format!("{} ({})", member.name, member.mention_name);
                         app.add_member_to_cache(member.id.clone(), display_name);
                         
                         // Update story ownership

@@ -231,9 +231,16 @@ impl App {
     pub fn get_owner_names(&self, owner_ids: &[String]) -> Vec<String> {
         owner_ids.iter()
             .map(|id| {
-                self.member_cache.get(id)
+                let name = self.member_cache.get(id)
                     .cloned()
-                    .unwrap_or_else(|| id.clone())
+                    .unwrap_or_else(|| {
+                        // If debug mode, log cache miss
+                        if std::env::var("RUST_LOG").is_ok() {
+                            eprintln!("Cache miss for owner ID: {}", id);
+                        }
+                        id.clone()
+                    });
+                name
             })
             .collect()
     }

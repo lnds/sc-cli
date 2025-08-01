@@ -224,8 +224,13 @@ impl ShortcutApi for ShortcutClient {
             anyhow::bail!("Failed to get members: {}. Error: {}", status, error_text);
         }
 
-        let members: Vec<Member> = response
-            .json()
+        let response_text = response.text().context("Failed to read members response")?;
+        
+        if self.debug {
+            eprintln!("Members response preview: {}", &response_text.chars().take(500).collect::<String>());
+        }
+        
+        let members: Vec<Member> = serde_json::from_str(&response_text)
             .context("Failed to parse members response")?;
 
         if self.debug {

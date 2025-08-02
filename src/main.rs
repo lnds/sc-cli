@@ -345,7 +345,7 @@ fn handle_view_command(
     setup_terminal()?;
     
     // Create app with stories and workflows
-    let mut app = App::new(stories, workflows);
+    let mut app = App::new(stories, workflows.clone());
     
     // Populate the member cache in the app
     for (id, name) in member_cache {
@@ -371,7 +371,7 @@ fn handle_view_command(
         }
     }
     
-    let result = run_app(app, client);
+    let result = run_app(app, client, workflows);
 
     // Restore terminal
     restore_terminal()?;
@@ -393,7 +393,7 @@ fn restore_terminal() -> Result<()> {
     Ok(())
 }
 
-fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
+fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>) -> Result<()> {
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
@@ -462,6 +462,54 @@ fn run_app(mut app: App, client: ShortcutClient) -> Result<()> {
             app.take_ownership_requested = false;
         }
 
+        // Check if we need to create a new story
+        if app.create_story_requested && !app.create_popup_state.name.is_empty() {
+            // Get current member info to use as requester
+            match client.get_current_member() {
+                Ok(current_member) => {
+                    // Find the first workflow state
+                    let workflow_state_id = workflows.first()
+                        .and_then(|w| w.states.first())
+                        .map(|s| s.id)
+                        .unwrap_or(500000007); // Default to "To Do" if not found
+                    
+                    // Create the story using the popup data
+                    let story_creator = StoryCreator::new(
+                        app.create_popup_state.name.clone(),
+                        app.create_popup_state.description.clone(),
+                        app.create_popup_state.story_type.clone(),
+                        current_member.id,
+                        workflow_state_id,
+                    );
+                    
+                    match story_creator.create(&client) {
+                        Ok(new_story) => {
+                            // Add the new story to the app
+                            app.stories_by_state
+                                .entry(new_story.workflow_state_id)
+                                .or_default()
+                                .push(new_story);
+                            
+                            // Sort stories by position
+                            if let Some(stories) = app.stories_by_state.get_mut(&workflow_state_id) {
+                                stories.sort_by_key(|s| s.position);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to create story: {e}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to get current member: {e}");
+                }
+            }
+            
+            // Reset the popup state
+            app.create_popup_state = ui::CreatePopupState::default();
+            app.create_story_requested = false;
+        }
+
         if app.should_quit {
             break;
         }
@@ -508,3 +556,4 @@ fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Stor
         }
     }
 }
+

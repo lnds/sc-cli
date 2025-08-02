@@ -17,6 +17,9 @@ pub struct App {
     pub show_state_selector: bool,
     pub state_selector_index: usize,
     pub take_ownership_requested: bool,
+    pub create_story_requested: bool,
+    pub show_create_popup: bool,
+    pub create_popup_state: CreatePopupState,
     pub workflow_state_map: HashMap<i64, String>,
     pub member_cache: HashMap<String, String>, // owner_id -> name
     pub current_user_id: Option<String>, // ID of current user
@@ -25,6 +28,34 @@ pub struct App {
     pub selected_row: usize,
     pub stories_by_state: HashMap<i64, Vec<Story>>,
     pub workflow_states: Vec<(i64, String)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreatePopupState {
+    pub name: String,
+    pub description: String,
+    pub story_type: String,
+    pub selected_field: CreateField,
+    pub story_type_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CreateField {
+    Name,
+    Description,
+    Type,
+}
+
+impl Default for CreatePopupState {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            description: String::new(),
+            story_type: "feature".to_string(),
+            selected_field: CreateField::Name,
+            story_type_index: 0,
+        }
+    }
 }
 
 impl App {
@@ -70,6 +101,9 @@ impl App {
             show_state_selector: false,
             state_selector_index: 0,
             take_ownership_requested: false,
+            create_story_requested: false,
+            show_create_popup: false,
+            create_popup_state: CreatePopupState::default(),
             workflow_state_map,
             member_cache: HashMap::new(),
             current_user_id: None,
@@ -202,7 +236,70 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
-        if self.show_state_selector {
+        if self.show_create_popup {
+            // Handle create popup input
+            match key.code {
+                KeyCode::Esc => {
+                    self.show_create_popup = false;
+                    self.create_popup_state = CreatePopupState::default();
+                }
+                KeyCode::Tab => {
+                    // Move to next field
+                    self.create_popup_state.selected_field = match self.create_popup_state.selected_field {
+                        CreateField::Name => CreateField::Description,
+                        CreateField::Description => CreateField::Type,
+                        CreateField::Type => CreateField::Name,
+                    };
+                }
+                KeyCode::Enter => {
+                    if self.create_popup_state.selected_field == CreateField::Type {
+                        // Submit the story
+                        if !self.create_popup_state.name.is_empty() {
+                            self.create_story_requested = true;
+                            self.show_create_popup = false;
+                        }
+                    } else {
+                        // Move to next field on Enter
+                        self.create_popup_state.selected_field = match self.create_popup_state.selected_field {
+                            CreateField::Name => CreateField::Description,
+                            CreateField::Description => CreateField::Type,
+                            CreateField::Type => CreateField::Type,
+                        };
+                    }
+                }
+                KeyCode::Backspace => {
+                    match self.create_popup_state.selected_field {
+                        CreateField::Name => { self.create_popup_state.name.pop(); }
+                        CreateField::Description => { self.create_popup_state.description.pop(); }
+                        CreateField::Type => {}
+                    }
+                }
+                KeyCode::Char(c) => {
+                    match self.create_popup_state.selected_field {
+                        CreateField::Name => self.create_popup_state.name.push(c),
+                        CreateField::Description => self.create_popup_state.description.push(c),
+                        CreateField::Type => {}
+                    }
+                }
+                KeyCode::Up | KeyCode::Down if self.create_popup_state.selected_field == CreateField::Type => {
+                    // Cycle through story types
+                    let types = ["feature", "bug", "chore"];
+                    if key.code == KeyCode::Down {
+                        self.create_popup_state.story_type_index = 
+                            (self.create_popup_state.story_type_index + 1) % types.len();
+                    } else {
+                        self.create_popup_state.story_type_index = 
+                            if self.create_popup_state.story_type_index == 0 { 
+                                types.len() - 1 
+                            } else { 
+                                self.create_popup_state.story_type_index - 1 
+                            };
+                    }
+                    self.create_popup_state.story_type = types[self.create_popup_state.story_type_index].to_string();
+                }
+                _ => {}
+            }
+        } else if self.show_state_selector {
             // Handle state selector navigation
             match key.code {
                 KeyCode::Char('j') | KeyCode::Down => self.next_state_selection(),
@@ -227,6 +324,10 @@ impl App {
                     if self.get_selected_story().is_some() {
                         self.take_ownership_requested = true;
                     }
+                }
+                KeyCode::Char('a') => {
+                    self.show_create_popup = true;
+                    self.create_popup_state = CreatePopupState::default();
                 }
                 KeyCode::Esc if self.show_detail => self.show_detail = false,
                 _ => {}
@@ -450,7 +551,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     } else if app.show_detail {
         "Press [Esc] to close detail | [q] to quit"
     } else {
-        "[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [q] quit"
+        "[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [q] quit"
     };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(Color::DarkGray))
@@ -470,6 +571,11 @@ pub fn draw(frame: &mut Frame, app: &App) {
         if let Some(story) = app.get_selected_story() {
             draw_state_selector_popup(frame, story, app);
         }
+    }
+    
+    // Create story popup
+    if app.show_create_popup {
+        draw_create_popup(frame, app);
     }
 }
 
@@ -585,6 +691,104 @@ fn draw_state_selector_popup(frame: &mut Frame, story: &Story, app: &App) {
             .border_style(Style::default().fg(Color::Yellow)));
     
     frame.render_widget(list, area);
+}
+
+fn draw_create_popup(frame: &mut Frame, app: &App) {
+    let area = centered_rect(60, 50, frame.area());
+    frame.render_widget(Clear, area);
+    
+    // Create the main popup block
+    let popup = Block::default()
+        .title("Create New Story")
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::Black).fg(Color::White));
+    frame.render_widget(popup, area);
+    
+    // Create inner area for form fields
+    let inner = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+    
+    // Layout for form fields
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Name field
+            Constraint::Length(5), // Description field
+            Constraint::Length(3), // Type field
+            Constraint::Min(1),    // Space
+            Constraint::Length(2), // Help text
+        ])
+        .split(inner);
+    
+    // Name field
+    let name_style = if app.create_popup_state.selected_field == CreateField::Name {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let name_block = Block::default()
+        .title("Name")
+        .borders(Borders::ALL)
+        .border_style(name_style);
+    let name_text = Paragraph::new(app.create_popup_state.name.as_str())
+        .block(name_block);
+    frame.render_widget(name_text, chunks[0]);
+    
+    // Description field
+    let desc_style = if app.create_popup_state.selected_field == CreateField::Description {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let desc_block = Block::default()
+        .title("Description")
+        .borders(Borders::ALL)
+        .border_style(desc_style);
+    let desc_text = Paragraph::new(app.create_popup_state.description.as_str())
+        .block(desc_block)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(desc_text, chunks[1]);
+    
+    // Type field
+    let type_style = if app.create_popup_state.selected_field == CreateField::Type {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let type_block = Block::default()
+        .title("Type")
+        .borders(Borders::ALL)
+        .border_style(type_style);
+    
+    let type_text = if app.create_popup_state.selected_field == CreateField::Type {
+        format!("< {} >", app.create_popup_state.story_type)
+    } else {
+        app.create_popup_state.story_type.clone()
+    };
+    
+    let type_widget = Paragraph::new(type_text)
+        .block(type_block)
+        .alignment(Alignment::Center);
+    frame.render_widget(type_widget, chunks[2]);
+    
+    // Help text
+    let help_text = if app.create_popup_state.selected_field == CreateField::Type {
+        "[↑/↓] change type | [Tab] next field | [Enter] submit | [Esc] cancel"
+    } else {
+        "[Tab] next field | [Enter] next/submit | [Esc] cancel"
+    };
+    
+    let help = Paragraph::new(help_text)
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+    frame.render_widget(help, chunks[4]);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

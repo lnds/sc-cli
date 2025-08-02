@@ -292,6 +292,58 @@ mod tests {
         assert_eq!(sorted_stories[2].id, 3); // Third by position
     }
 
+    #[test]
+    fn test_create_story_popup() {
+        let stories = create_test_stories();
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
+        
+        // Initially popup should not be shown
+        assert!(!app.show_create_popup);
+        
+        // Simulate pressing 'a' key
+        app.handle_key_event(crossterm::event::KeyEvent {
+            code: crossterm::event::KeyCode::Char('a'),
+            modifiers: crossterm::event::KeyModifiers::NONE,
+            kind: crossterm::event::KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::NONE,
+        }).unwrap();
+        
+        // Popup should now be shown
+        assert!(app.show_create_popup);
+        assert_eq!(app.create_popup_state.selected_field, crate::ui::CreateField::Name);
+        
+        // Test typing in name field
+        app.handle_key_event(crossterm::event::KeyEvent {
+            code: crossterm::event::KeyCode::Char('T'),
+            modifiers: crossterm::event::KeyModifiers::NONE,
+            kind: crossterm::event::KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::NONE,
+        }).unwrap();
+        
+        assert_eq!(app.create_popup_state.name, "T");
+        
+        // Test Tab to move to description
+        app.handle_key_event(crossterm::event::KeyEvent {
+            code: crossterm::event::KeyCode::Tab,
+            modifiers: crossterm::event::KeyModifiers::NONE,
+            kind: crossterm::event::KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::NONE,
+        }).unwrap();
+        
+        assert_eq!(app.create_popup_state.selected_field, crate::ui::CreateField::Description);
+        
+        // Test Esc to close
+        app.handle_key_event(crossterm::event::KeyEvent {
+            code: crossterm::event::KeyCode::Esc,
+            modifiers: crossterm::event::KeyModifiers::NONE,
+            kind: crossterm::event::KeyEventKind::Press,
+            state: crossterm::event::KeyEventState::NONE,
+        }).unwrap();
+        
+        assert!(!app.show_create_popup);
+    }
+
     // Note: Event handling tests would require mocking crossterm events
     // which is complex for unit tests. These are better suited for integration tests.
 }

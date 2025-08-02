@@ -105,6 +105,7 @@ user_id = "your.work.mention.name"
 - **Enter** - View story details
 - **Space** - Move story to a different workflow state
 - **o** - Take ownership of the selected story
+- **a** - Add a new story
 - **Esc** - Close detail view or cancel state selection
 - **q** - Quit the application
 
@@ -125,6 +126,20 @@ When you press **o** on a selected story:
 - This uses the API token's associated user account
 - The story display will refresh to show the updated ownership
 - This is useful for quickly claiming unassigned stories or taking over stories from other team members
+
+#### Creating Stories in TUI
+
+When you press **a** in the TUI:
+- A popup form appears for creating a new story
+- Navigate between fields using **Tab**
+- Fill in the following fields:
+  - **Name**: The story title (required)
+  - **Description**: Detailed story description
+  - **Type**: Use **↑/↓** to select between feature, bug, or chore
+- Press **Enter** on the Type field to submit the story
+- Press **Esc** at any time to cancel
+- The story is created with you as the requester
+- The new story appears in the first workflow state (typically "Backlog" or "To Do")
 
 ### Examples
 

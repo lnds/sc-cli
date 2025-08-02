@@ -38,6 +38,20 @@ struct ViewCommandArgs {
     debug: bool,
 }
 
+#[derive(Debug)]
+struct ShowCommandArgs {
+    workspace: Option<String>,
+    username: Option<String>,
+    token: Option<String>,
+    limit: usize,
+    story_type: Option<String>,
+    search: Option<String>,
+    all: bool,
+    _owner: bool,
+    requester: bool,
+    debug: bool,
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about = "CLI and TUI client for Shortcut stories", long_about = None)]
 struct Args {
@@ -159,7 +173,18 @@ fn main() -> Result<()> {
             })
         }
         Some(Command::Show { username, token, limit, story_type, search, all, owner, requester }) => {
-            handle_show_command(args.workspace, username, token, limit, story_type, search, all, owner, requester, args.debug)
+            handle_show_command(ShowCommandArgs {
+                workspace: args.workspace,
+                username,
+                token,
+                limit,
+                story_type,
+                search,
+                all,
+                _owner: owner,
+                requester,
+                debug: args.debug,
+            })
         }
         None => {
             // Default to view command when no subcommand is specified
@@ -687,27 +712,16 @@ fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Stor
     }
 }
 
-fn handle_show_command(
-    workspace: Option<String>,
-    username: Option<String>,
-    token: Option<String>,
-    limit: usize,
-    story_type: Option<String>,
-    search: Option<String>,
-    all: bool,
-    _owner: bool,
-    requester: bool,
-    debug: bool,
-) -> Result<()> {
+fn handle_show_command(args: ShowCommandArgs) -> Result<()> {
     // Get token, username, and config from args or config (similar to view command)
-    let (api_token, search_username, _config_limit) = if let Some(workspace_name) = workspace {
+    let (api_token, search_username, _config_limit) = if let Some(workspace_name) = args.workspace {
         // Use explicitly specified workspace
         let (config, _created) = Config::load_or_create(&workspace_name)
             .context("Failed to load or create config")?;
         let workspace_config = config.get_workspace(&workspace_name)
             .context(format!("Failed to get workspace '{workspace_name}'"))?;
         (workspace_config.api_key.clone(), workspace_config.user_id.clone(), workspace_config.fetch_limit)
-    } else if token.is_none() && username.is_none() {
+    } else if args.token.is_none() && args.username.is_none() {
         // No args provided, try to use default workspace
         match Config::load() {
             Ok(config) => {
@@ -725,34 +739,34 @@ fn handle_show_command(
         }
     } else {
         // Use command line arguments
-        let api_token = token
+        let api_token = args.token
             .ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?;
-        let search_username = username
+        let search_username = args.username
             .ok_or_else(|| anyhow::anyhow!("Either username or --workspace must be provided"))?;
         (api_token, search_username, 50) // Default limit when not using workspace
     };
 
     // Initialize API client
-    let client = ShortcutClient::new(api_token, debug)
+    let client = ShortcutClient::new(api_token, args.debug)
         .context("Failed to create Shortcut client")?;
 
     // Build search query (similar to view command)
-    let query = if let Some(search_query) = search {
+    let query = if let Some(search_query) = args.search {
         search_query
     } else {
         let mut query_parts = vec![];
         
         // Apply filter based on flags (default to owner if none specified)
-        if all {
+        if args.all {
             // No user filter for --all flag
-        } else if requester {
+        } else if args.requester {
             query_parts.push(format!("requester:{search_username}"));
         } else {
             // Default to owner filter (also when --owner is explicitly used)
             query_parts.push(format!("owner:{search_username}"));
         }
         
-        if let Some(story_type) = story_type {
+        if let Some(story_type) = args.story_type {
             query_parts.push(format!("type:{story_type}"));
         }
         
@@ -760,9 +774,9 @@ fn handle_show_command(
         query_parts.join(" ")
     };
 
-    if debug {
+    if args.debug {
         eprintln!("Search query: {query}");
-        eprintln!("Stories per page: {limit}");
+        eprintln!("Stories per page: {}", args.limit);
     }
 
     // Get workflows for state name resolution
@@ -779,7 +793,7 @@ fn handle_show_command(
 
     // Fetch members for owner name resolution
     let mut member_cache = std::collections::HashMap::new();
-    if debug {
+    if args.debug {
         eprintln!("Fetching members for name resolution...");
     }
     match client.get_members() {
@@ -788,12 +802,12 @@ fn handle_show_command(
                 let display_name = format!("{} ({})", member.profile.name, member.profile.mention_name);
                 member_cache.insert(member.id, display_name);
             }
-            if debug {
+            if args.debug {
                 eprintln!("Cached {} members", member_cache.len());
             }
         }
         Err(e) => {
-            if debug {
+            if args.debug {
                 eprintln!("WARNING: Failed to fetch members: {e}");
                 eprintln!("Owner names will be displayed as IDs");
             }
@@ -801,7 +815,7 @@ fn handle_show_command(
     }
 
     // Start pagination
-    show_stories_paginated(&client, &query, limit, debug, &workflow_state_map, &member_cache)
+    show_stories_paginated(&client, &query, args.limit, args.debug, &workflow_state_map, &member_cache)
 }
 
 fn show_stories_paginated(
@@ -888,7 +902,7 @@ fn show_stories_paginated(
                 let first_line = story.description.lines().next().unwrap_or("");
                 if !first_line.is_empty() {
                     // Description with light gray color and document emoji
-                    println!("   \x1b[37m📄 {}\x1b[0m", first_line);
+                    println!("   \x1b[37m📄 {first_line}\x1b[0m");
                 }
             }
             
@@ -939,7 +953,7 @@ fn show_stories_paginated(
         }
         
         // Show pagination prompt with colors and emojis
-        print!("\x1b[1;44m📖 More \x1b[0m \x1b[36m({} stories shown, press \x1b[1;33mSPACE\x1b[0m\x1b[36m to continue, \x1b[1;33mq\x1b[0m\x1b[36m to quit)\x1b[0m", total_shown);
+        print!("\x1b[1;44m📖 More \x1b[0m \x1b[36m({total_shown} stories shown, press \x1b[1;33mSPACE\x1b[0m\x1b[36m to continue, \x1b[1;33mq\x1b[0m\x1b[36m to quit)\x1b[0m");
         io::stdout().flush()?;
         
         // Wait for user input

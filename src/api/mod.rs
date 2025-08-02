@@ -107,10 +107,12 @@ pub struct CurrentMember {
 pub struct SearchStoriesResult {
     pub stories: Vec<Story>,
     pub next_page_token: Option<String>,
+    #[allow(dead_code)]
     pub total: Option<i64>,
 }
 
 pub trait ShortcutApi {
+    #[allow(dead_code)]
     fn search_stories(&self, query: &str, limit: Option<usize>) -> Result<Vec<Story>>;
     fn search_stories_page(&self, query: &str, next_token: Option<String>) -> Result<SearchStoriesResult>;
     fn get_workflows(&self) -> Result<Vec<Workflow>>;

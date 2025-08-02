@@ -392,6 +392,216 @@ mod tests {
         assert_eq!(app.detail_scroll_offset, 0); // Reset on open
     }
 
+    #[test]
+    fn test_initial_selection_first_non_empty_column() {
+        // Create stories where first workflow state is empty, second has stories
+        let stories = vec![
+            Story {
+                id: 1,
+                name: "Story in second state".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 20, // Second workflow state
+                app_url: "".to_string(),
+                story_type: "feature".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 1000,
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+                comments: vec![],
+            },
+            Story {
+                id: 2,
+                name: "Another story in second state".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 20, // Second workflow state
+                app_url: "".to_string(),
+                story_type: "bug".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 2000,
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+                comments: vec![],
+            },
+        ];
+
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Test Workflow".to_string(),
+            states: vec![
+                WorkflowState {
+                    id: 10,
+                    name: "Empty State".to_string(),
+                    color: "#000000".to_string(),
+                    position: 1, // First position but empty
+                },
+                WorkflowState {
+                    id: 20,
+                    name: "Has Stories".to_string(),
+                    color: "#f39c12".to_string(),
+                    position: 2, // Second position with stories
+                },
+                WorkflowState {
+                    id: 30,
+                    name: "Another Empty".to_string(),
+                    color: "#27ae60".to_string(),
+                    position: 3, // Third position but empty
+                },
+            ],
+        }];
+
+        let app = App::new(stories, workflows);
+
+        // Should select column 1 (second workflow state) since first is empty
+        assert_eq!(app.selected_column, 1);
+        assert_eq!(app.selected_row, 0);
+        
+        // Verify the selected story is correct
+        let selected_story = app.get_selected_story().unwrap();
+        assert_eq!(selected_story.id, 1); // First story in the second state
+    }
+
+    #[test]
+    fn test_initial_selection_first_column_has_stories() {
+        // Create stories where first workflow state has stories
+        let stories = vec![
+            Story {
+                id: 1,
+                name: "Story in first state".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 10, // First workflow state
+                app_url: "".to_string(),
+                story_type: "feature".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 1000,
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+                comments: vec![],
+            },
+        ];
+
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Test Workflow".to_string(),
+            states: vec![
+                WorkflowState {
+                    id: 10,
+                    name: "Has Stories".to_string(),
+                    color: "#000000".to_string(),
+                    position: 1, // First position with stories
+                },
+                WorkflowState {
+                    id: 20,
+                    name: "Empty State".to_string(),
+                    color: "#f39c12".to_string(),
+                    position: 2, // Second position but empty
+                },
+            ],
+        }];
+
+        let app = App::new(stories, workflows);
+
+        // Should select column 0 (first workflow state) since it has stories
+        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_row, 0);
+        
+        // Verify the selected story is correct
+        let selected_story = app.get_selected_story().unwrap();
+        assert_eq!(selected_story.id, 1);
+    }
+
+    #[test]
+    fn test_initial_selection_all_columns_empty() {
+        // Create no stories
+        let stories = vec![];
+
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Test Workflow".to_string(),
+            states: vec![
+                WorkflowState {
+                    id: 10,
+                    name: "Empty State 1".to_string(),
+                    color: "#000000".to_string(),
+                    position: 1,
+                },
+                WorkflowState {
+                    id: 20,
+                    name: "Empty State 2".to_string(),
+                    color: "#f39c12".to_string(),
+                    position: 2,
+                },
+            ],
+        }];
+
+        let app = App::new(stories, workflows);
+
+        // Should still select column 0 (fallback behavior)
+        assert_eq!(app.selected_column, 0);
+        assert_eq!(app.selected_row, 0);
+        
+        // Verify no story is selected
+        assert!(app.get_selected_story().is_none());
+    }
+
+    #[test]
+    fn test_initial_selection_last_column_has_stories() {
+        // Create stories where only the last workflow state has stories
+        let stories = vec![
+            Story {
+                id: 1,
+                name: "Story in last state".to_string(),
+                description: "".to_string(),
+                workflow_state_id: 30, // Last workflow state
+                app_url: "".to_string(),
+                story_type: "feature".to_string(),
+                labels: vec![],
+                owner_ids: vec![],
+                position: 1000,
+                created_at: "".to_string(),
+                updated_at: "".to_string(),
+                comments: vec![],
+            },
+        ];
+
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Test Workflow".to_string(),
+            states: vec![
+                WorkflowState {
+                    id: 10,
+                    name: "Empty State 1".to_string(),
+                    color: "#000000".to_string(),
+                    position: 1,
+                },
+                WorkflowState {
+                    id: 20,
+                    name: "Empty State 2".to_string(),
+                    color: "#f39c12".to_string(),
+                    position: 2,
+                },
+                WorkflowState {
+                    id: 30,
+                    name: "Has Stories".to_string(),
+                    color: "#27ae60".to_string(),
+                    position: 3, // Last position with stories
+                },
+            ],
+        }];
+
+        let app = App::new(stories, workflows);
+
+        // Should select column 2 (last workflow state) since others are empty
+        assert_eq!(app.selected_column, 2);
+        assert_eq!(app.selected_row, 0);
+        
+        // Verify the selected story is correct
+        let selected_story = app.get_selected_story().unwrap();
+        assert_eq!(selected_story.id, 1);
+    }
+
     // Note: Event handling tests would require mocking crossterm events
     // which is complex for unit tests. These are better suited for integration tests.
 }

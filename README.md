@@ -238,6 +238,7 @@ The TUI shows:
 
 - Stories organized in columns by workflow state (To Do, In Progress, Done, etc.)
 - All workflow states are displayed, even if they contain no stories
+- Automatically selects the first story in the leftmost column that contains stories
 - Story count for each column in the header
 - Story list with ID and name
 - Stories owned by you are displayed in cyan color for easy identification

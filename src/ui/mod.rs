@@ -97,6 +97,17 @@ impl App {
             state_positions.get(id).copied().unwrap_or(i64::MAX)
         });
 
+        // Find the first column (workflow state) that contains stories
+        let mut selected_column = 0;
+        for (index, (state_id, _)) in workflow_states.iter().enumerate() {
+            if let Some(stories) = stories_by_state.get(state_id) {
+                if !stories.is_empty() {
+                    selected_column = index;
+                    break;
+                }
+            }
+        }
+
         Self {
             show_detail: false,
             show_state_selector: false,
@@ -110,7 +121,7 @@ impl App {
             current_user_id: None,
             detail_scroll_offset: 0,
             should_quit: false,
-            selected_column: 0,
+            selected_column,
             selected_row: 0,
             stories_by_state,
             workflow_states,

@@ -102,6 +102,39 @@ enum Command {
         #[arg(long, conflicts_with_all = ["all", "owner"])]
         requester: bool,
     },
+    /// Show stories in terminal with pagination (like more command)
+    Show {
+        /// Shortcut mention name to search for (optional if using workspace)
+        username: Option<String>,
+
+        /// Shortcut API token (optional if using workspace)
+        #[arg(short, long)]
+        token: Option<String>,
+
+        /// Number of stories to show per page (default: 10)
+        #[arg(short, long, default_value = "10")]
+        limit: usize,
+
+        /// Filter by story type (feature, bug, chore)
+        #[arg(long)]
+        story_type: Option<String>,
+
+        /// Custom search query using Shortcut's search syntax
+        #[arg(short, long)]
+        search: Option<String>,
+
+        /// Show all stories (no owner/requester filter)
+        #[arg(long, conflicts_with_all = ["owner", "requester"])]
+        all: bool,
+
+        /// Show stories where user is the owner (default)
+        #[arg(long, conflicts_with_all = ["all", "requester"])]
+        owner: bool,
+
+        /// Show stories where user is the requester
+        #[arg(long, conflicts_with_all = ["all", "owner"])]
+        requester: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -124,6 +157,9 @@ fn main() -> Result<()> {
                 requester,
                 debug: args.debug,
             })
+        }
+        Some(Command::Show { username, token, limit, story_type, search, all, owner, requester }) => {
+            handle_show_command(args.workspace, username, token, limit, story_type, search, all, owner, requester, args.debug)
         }
         None => {
             // Default to view command when no subcommand is specified
@@ -647,6 +683,319 @@ fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Stor
     if let Some(stories) = app.stories_by_state.get_mut(&state_id) {
         if let Some(pos) = stories.iter().position(|s| s.id == story_id) {
             stories[pos] = updated_story;
+        }
+    }
+}
+
+fn handle_show_command(
+    workspace: Option<String>,
+    username: Option<String>,
+    token: Option<String>,
+    limit: usize,
+    story_type: Option<String>,
+    search: Option<String>,
+    all: bool,
+    _owner: bool,
+    requester: bool,
+    debug: bool,
+) -> Result<()> {
+    // Get token, username, and config from args or config (similar to view command)
+    let (api_token, search_username, _config_limit) = if let Some(workspace_name) = workspace {
+        // Use explicitly specified workspace
+        let (config, _created) = Config::load_or_create(&workspace_name)
+            .context("Failed to load or create config")?;
+        let workspace_config = config.get_workspace(&workspace_name)
+            .context(format!("Failed to get workspace '{workspace_name}'"))?;
+        (workspace_config.api_key.clone(), workspace_config.user_id.clone(), workspace_config.fetch_limit)
+    } else if token.is_none() && username.is_none() {
+        // No args provided, try to use default workspace
+        match Config::load() {
+            Ok(config) => {
+                if let Some(default_workspace_name) = config.get_default_workspace() {
+                    let workspace_config = config.get_workspace(&default_workspace_name)
+                        .context(format!("Failed to get default workspace '{default_workspace_name}'"))?;
+                    (workspace_config.api_key.clone(), workspace_config.user_id.clone(), workspace_config.fetch_limit)
+                } else {
+                    anyhow::bail!("No default workspace configured. Use --workspace to specify one or provide --token and username");
+                }
+            }
+            Err(_) => {
+                anyhow::bail!("No configuration file found. Use --workspace to create one or provide --token and username");
+            }
+        }
+    } else {
+        // Use command line arguments
+        let api_token = token
+            .ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?;
+        let search_username = username
+            .ok_or_else(|| anyhow::anyhow!("Either username or --workspace must be provided"))?;
+        (api_token, search_username, 50) // Default limit when not using workspace
+    };
+
+    // Initialize API client
+    let client = ShortcutClient::new(api_token, debug)
+        .context("Failed to create Shortcut client")?;
+
+    // Build search query (similar to view command)
+    let query = if let Some(search_query) = search {
+        search_query
+    } else {
+        let mut query_parts = vec![];
+        
+        // Apply filter based on flags (default to owner if none specified)
+        if all {
+            // No user filter for --all flag
+        } else if requester {
+            query_parts.push(format!("requester:{search_username}"));
+        } else {
+            // Default to owner filter (also when --owner is explicitly used)
+            query_parts.push(format!("owner:{search_username}"));
+        }
+        
+        if let Some(story_type) = story_type {
+            query_parts.push(format!("type:{story_type}"));
+        }
+        
+        query_parts.push("is:story".to_string());
+        query_parts.join(" ")
+    };
+
+    if debug {
+        eprintln!("Search query: {query}");
+        eprintln!("Stories per page: {limit}");
+    }
+
+    // Get workflows for state name resolution
+    let workflows = client.get_workflows()
+        .context("Failed to fetch workflows")?;
+
+    // Build workflow state map
+    let mut workflow_state_map = std::collections::HashMap::new();
+    for workflow in &workflows {
+        for state in &workflow.states {
+            workflow_state_map.insert(state.id, state.name.clone());
+        }
+    }
+
+    // Fetch members for owner name resolution
+    let mut member_cache = std::collections::HashMap::new();
+    if debug {
+        eprintln!("Fetching members for name resolution...");
+    }
+    match client.get_members() {
+        Ok(members) => {
+            for member in members {
+                let display_name = format!("{} ({})", member.profile.name, member.profile.mention_name);
+                member_cache.insert(member.id, display_name);
+            }
+            if debug {
+                eprintln!("Cached {} members", member_cache.len());
+            }
+        }
+        Err(e) => {
+            if debug {
+                eprintln!("WARNING: Failed to fetch members: {e}");
+                eprintln!("Owner names will be displayed as IDs");
+            }
+        }
+    }
+
+    // Start pagination
+    show_stories_paginated(&client, &query, limit, debug, &workflow_state_map, &member_cache)
+}
+
+fn show_stories_paginated(
+    client: &ShortcutClient, 
+    query: &str, 
+    page_size: usize, 
+    debug: bool,
+    workflow_state_map: &std::collections::HashMap<i64, String>,
+    member_cache: &std::collections::HashMap<String, String>
+) -> Result<()> {
+    use std::io::{self, Write};
+    
+    let mut next_page_token: Option<String> = None;
+    let mut total_shown = 0;
+    let mut current_batch: Vec<api::Story> = Vec::new();
+    let mut batch_index = 0;
+
+    loop {
+        // If we need more stories (either first time or current batch exhausted)
+        if current_batch.is_empty() || batch_index >= current_batch.len() {
+            if current_batch.is_empty() {
+                // First fetch
+                if debug {
+                    eprintln!("Making initial API call...");
+                }
+                let search_result = client
+                    .search_stories_page(query, None)
+                    .context("Failed to search stories")?;
+                
+                if search_result.stories.is_empty() {
+                    println!("\x1b[33m🔍 No stories found for query: {query}\x1b[0m");
+                    println!("\x1b[37m💡 Try using a different search query or check if the username is correct.\x1b[0m");
+                    break;
+                }
+                
+                current_batch = search_result.stories;
+                batch_index = 0;
+                next_page_token = search_result.next_page_token;
+                
+                if debug {
+                    eprintln!("Initial fetch: {} stories, next_token: {:?}", current_batch.len(), next_page_token);
+                }
+            } else if next_page_token.is_some() {
+                // Fetch next batch from API
+                if debug {
+                    eprintln!("Fetching next batch from API...");
+                }
+                let search_result = client
+                    .search_stories_page(query, next_page_token.clone())
+                    .context("Failed to search stories")?;
+                
+                if search_result.stories.is_empty() {
+                    println!("\x1b[32m🎉 End of stories\x1b[0m");
+                    break;
+                }
+                
+                current_batch = search_result.stories;
+                batch_index = 0;
+                next_page_token = search_result.next_page_token;
+                
+                if debug {
+                    eprintln!("Fetched {} stories from API, next_token: {:?}", current_batch.len(), next_page_token);
+                }
+            } else {
+                // No more stories available
+                println!("\x1b[32m🎉 End of stories\x1b[0m");
+                break;
+            }
+        }
+
+        // Display page_size stories from current batch
+        let end_index = std::cmp::min(batch_index + page_size, current_batch.len());
+        let stories_to_show = &current_batch[batch_index..end_index];
+        
+        if debug {
+            eprintln!("Showing stories {} to {} from current batch", batch_index, end_index - 1);
+        }
+
+        for story in stories_to_show {
+            // Story title with bright cyan color and lightning bolt emoji
+            println!("\x1b[1;36m⚡ #{} - {}\x1b[0m", story.id, story.name);
+            
+            if !story.description.is_empty() {
+                let first_line = story.description.lines().next().unwrap_or("");
+                if !first_line.is_empty() {
+                    // Description with light gray color and document emoji
+                    println!("   \x1b[37m📄 {}\x1b[0m", first_line);
+                }
+            }
+            
+            if !story.owner_ids.is_empty() {
+                let owner_names: Vec<String> = story.owner_ids.iter()
+                    .map(|id| member_cache.get(id).cloned().unwrap_or_else(|| id.clone()))
+                    .collect();
+                // Owners with yellow color and person emoji
+                println!("   \x1b[33m👤 Owner(s): {}\x1b[0m", owner_names.join(", "));
+            }
+            
+            let state_name = workflow_state_map.get(&story.workflow_state_id)
+                .cloned()
+                .unwrap_or_else(|| story.workflow_state_id.to_string());
+            
+            // Get emoji and color based on story type
+            let (type_emoji, type_color) = match story.story_type.as_str() {
+                "feature" => ("✨", "\x1b[32m"), // Green for features
+                "bug" => ("🐛", "\x1b[31m"),      // Red for bugs  
+                "chore" => ("⚙️", "\x1b[34m"),    // Blue for chores
+                _ => ("📝", "\x1b[37m"),          // Default gray
+            };
+            
+            // Get emoji based on state name
+            let state_emoji = match state_name.to_lowercase().as_str() {
+                name if name.contains("todo") || name.contains("backlog") => "📋",
+                name if name.contains("progress") || name.contains("doing") => "🔄", 
+                name if name.contains("review") => "👀",
+                name if name.contains("done") || name.contains("complete") => "✅",
+                _ => "📌",
+            };
+            
+            // State, type, and URL with appropriate colors and emojis
+            println!("   {} \x1b[35m{}\x1b[0m | {}{} {}\x1b[0m | \x1b[36m🔗 {}\x1b[0m", 
+                state_emoji, state_name, type_emoji, type_color, story.story_type, story.app_url);
+            println!(); // Empty line between stories
+        }
+
+        total_shown += stories_to_show.len();
+        batch_index = end_index;
+        
+        // Check if we have more stories to show (either in current batch or from API)
+        let has_more = batch_index < current_batch.len() || next_page_token.is_some();
+        
+        if !has_more {
+            println!("\x1b[32m🎉 End of stories\x1b[0m");
+            break;
+        }
+        
+        // Show pagination prompt with colors and emojis
+        print!("\x1b[1;44m📖 More \x1b[0m \x1b[36m({} stories shown, press \x1b[1;33mSPACE\x1b[0m\x1b[36m to continue, \x1b[1;33mq\x1b[0m\x1b[36m to quit)\x1b[0m", total_shown);
+        io::stdout().flush()?;
+        
+        // Wait for user input
+        match wait_for_spacebar() {
+            Ok(true) => {
+                continue; // Continue to next page
+            }
+            Ok(false) => {
+                println!("\n\x1b[33m👋 Goodbye!\x1b[0m");
+                break;
+            }
+            Err(e) => {
+                eprintln!("Error reading input: {e}");
+                break;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn wait_for_spacebar() -> Result<bool> {
+    use crossterm::{
+        event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+        terminal::{disable_raw_mode, enable_raw_mode},
+    };
+    use std::io::{self, Write};
+    
+    // Enable raw mode to capture single keystrokes
+    enable_raw_mode()?;
+    
+    loop {
+        // Wait for key event
+        if let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = event::read()? {
+            disable_raw_mode()?;
+            
+            match code {
+                KeyCode::Char(' ') => {
+                    // Clear the prompt line
+                    print!("\r{}\r", " ".repeat(50));
+                    io::stdout().flush()?;
+                    return Ok(true);
+                }
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    // Clear the prompt line
+                    print!("\r{}\r", " ".repeat(50));
+                    io::stdout().flush()?;
+                    return Ok(false);
+                }
+                _ => {
+                    // Any other key quits
+                    print!("\r{}\r", " ".repeat(50));
+                    io::stdout().flush()?;
+                    return Ok(false);
+                }
+            }
         }
     }
 }

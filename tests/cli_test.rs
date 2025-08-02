@@ -27,6 +27,7 @@ fn test_cli_help() {
         .stdout(predicate::str::contains("--workspace"))
         .stdout(predicate::str::contains("--debug"))
         .stdout(predicate::str::contains("add"))
+        .stdout(predicate::str::contains("finish"))
         .stdout(predicate::str::contains("view"));
 }
 
@@ -133,4 +134,51 @@ fn test_cli_add_type_validation() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("Invalid story type"));
+}
+
+#[test]
+fn test_cli_finish_help() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("finish")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Mark a story as finished"))
+        .stdout(predicate::str::contains("STORY_ID"))
+        .stdout(predicate::str::contains("Story ID to mark as finished"));
+}
+
+#[test]
+fn test_cli_finish_requires_story_id() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("finish")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required"));
+}
+
+#[test]
+fn test_cli_finish_requires_auth() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Set HOME to a temp directory to ensure no config file is found
+    cmd.env("HOME", "/tmp/nonexistent-home-dir-for-test")
+        .arg("finish")
+        .arg("12345")
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("No default workspace configured")
+                .or(predicate::str::contains("No configuration file found"))
+                .or(predicate::str::contains("Either --token or --workspace must be provided"))
+        );
+}
+
+#[test]
+fn test_cli_finish_story_id_numeric() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("finish")
+        .arg("not-a-number")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid"));
 }

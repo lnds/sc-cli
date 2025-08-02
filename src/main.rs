@@ -83,6 +83,15 @@ enum Command {
         #[arg(long, value_parser = validate_story_type)]
         r#type: Option<String>,
     },
+    /// Mark a story as finished (Done state)
+    Finish {
+        /// Story ID to mark as finished
+        story_id: i64,
+
+        /// Shortcut API token (optional if using workspace)
+        #[arg(short, long)]
+        token: Option<String>,
+    },
     /// View stories in TUI mode (default command)
     View {
         /// Shortcut mention name to search for (optional if using workspace)
@@ -157,6 +166,9 @@ fn main() -> Result<()> {
     match args.command {
         Some(Command::Add { name, token, r#type }) => {
             handle_add_command(args.workspace, token, name, r#type, args.debug)
+        }
+        Some(Command::Finish { story_id, token }) => {
+            handle_finish_command(args.workspace, token, story_id, args.debug)
         }
         Some(Command::View { username, token, limit, story_type, search, all, owner, requester }) => {
             handle_view_command(ViewCommandArgs {
@@ -293,6 +305,84 @@ fn handle_add_command(workspace: Option<String>, token: Option<String>, name: Ve
     Ok(())
 }
 
+fn handle_finish_command(workspace: Option<String>, token: Option<String>, story_id: i64, debug: bool) -> Result<()> {
+    // Get token from args or config
+    // Priority: 1. Explicit workspace, 2. Default workspace (if no token), 3. Token from CLI
+    let token = if let Some(workspace_name) = workspace {
+        // Use explicitly specified workspace
+        let (config, _created) = Config::load_or_create(&workspace_name)
+            .context("Failed to load or create config")?;
+        let workspace = config.get_workspace(&workspace_name)
+            .context(format!("Failed to get workspace '{workspace_name}'"))?;
+        workspace.api_key.clone()
+    } else if token.is_none() {
+        // No args provided, try to use default workspace
+        match Config::load() {
+            Ok(config) => {
+                if let Some(default_workspace_name) = config.get_default_workspace() {
+                    let workspace = config.get_workspace(&default_workspace_name)
+                        .context(format!("Failed to get default workspace '{default_workspace_name}'"))?;
+                    workspace.api_key.clone()
+                } else {
+                    anyhow::bail!("No default workspace configured. Use --workspace to specify one or provide --token");
+                }
+            }
+            Err(_) => {
+                anyhow::bail!("No configuration file found. Use --workspace to create one or provide --token");
+            }
+        }
+    } else {
+        // Use command line arguments
+        token.ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?
+    };
+
+    // Initialize API client
+    let client = ShortcutClient::new(token, debug)
+        .context("Failed to create Shortcut client")?;
+
+    // Get current member info for debug/confirmation
+    let current_member = client.get_current_member()
+        .context("Failed to get current member info")?;
+    
+    if debug {
+        eprintln!("Current user: {} ({}) - ID: {}", current_member.name, current_member.mention_name, current_member.id);
+        eprintln!("Marking story #{} as finished...", story_id);
+    }
+
+    // Update story to Done state (workflow_state_id: 500000010)
+    let done_state_id = 500000010;
+    
+    match client.update_story_state(story_id, done_state_id) {
+        Ok(updated_story) => {
+            println!("✅ Story successfully marked as finished!");
+            println!("  ID: #{}", updated_story.id);
+            println!("  Name: {}", updated_story.name);
+            println!("  URL: {}", updated_story.app_url);
+            
+            if debug {
+                eprintln!("Story moved to workflow state ID: {}", updated_story.workflow_state_id);
+            }
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to mark story as finished: {}", e);
+            
+            if debug {
+                eprintln!("Error details: {:?}", e);
+            }
+            
+            // Check if it's a 404 error (story not found)
+            if e.to_string().contains("404") {
+                eprintln!("💡 Story #{} was not found. Please check the story ID.", story_id);
+            } else if e.to_string().contains("422") {
+                eprintln!("💡 The story might already be in the Done state or there might be a workflow restriction.");
+            }
+            
+            anyhow::bail!("Failed to finish story");
+        }
+    }
+
+    Ok(())
+}
 
 fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
     // Get token, username, and fetch_limit from args or config

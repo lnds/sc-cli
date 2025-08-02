@@ -72,6 +72,11 @@ pub struct App {
     pub stories_by_state: HashMap<i64, Vec<Story>>,
     pub workflow_states: Vec<(i64, String)>,
     pub workflows: Vec<Workflow>, // Store workflows for filtering
+    // List view mode
+    pub list_view_mode: bool, // Toggle between column view and list view
+    pub all_stories_list: Vec<Story>, // Flattened list of all stories for list view
+    pub list_selected_index: usize, // Selected story index in list view
+    pub list_scroll_offset: usize, // Scroll offset for list view
     // Pagination state
     pub search_query: String, // Store the current search query
     pub next_page_token: Option<String>, // Token for the next page
@@ -183,6 +188,10 @@ impl App {
         }
 
         let total_stories = filtered_stories.len();
+
+        // Create a flattened list of all stories for list view, sorted by position
+        let mut all_stories_list = filtered_stories.clone();
+        all_stories_list.sort_by_key(|s| s.position);
         
         Self {
             show_detail: false,
@@ -202,6 +211,10 @@ impl App {
             stories_by_state,
             workflow_states,
             workflows,
+            list_view_mode: false,
+            all_stories_list,
+            list_selected_index: 0,
+            list_scroll_offset: 0,
             search_query,
             next_page_token,
             load_more_requested: false,
@@ -210,31 +223,92 @@ impl App {
         }
     }
 
-    pub fn next(&mut self) {
-        if self.workflow_states.is_empty() {
+    pub fn toggle_view_mode(&mut self) {
+        self.list_view_mode = !self.list_view_mode;
+        // Reset selections when switching modes
+        if self.list_view_mode {
+            self.list_selected_index = 0;
+            self.list_scroll_offset = 0;
+        } else {
+            self.selected_column = 0;
+            self.selected_row = 0;
+        }
+    }
+
+    pub fn update_list_scroll(&mut self, visible_height: usize) {
+        if !self.list_view_mode || self.all_stories_list.is_empty() {
             return;
         }
-        
-        let state_id = self.workflow_states[self.selected_column].0;
-        if let Some(stories) = self.stories_by_state.get(&state_id) {
-            if !stories.is_empty() {
-                self.selected_row = (self.selected_row + 1) % stories.len();
+
+        // Each story takes 2 lines (title + optional wrapped name)
+        let visible_stories = visible_height / 2;
+        if visible_stories == 0 {
+            return;
+        }
+
+        // Ensure selected item is visible
+        if self.list_selected_index < self.list_scroll_offset {
+            // Selected item is above visible area, scroll up
+            self.list_scroll_offset = self.list_selected_index;
+        } else if self.list_selected_index >= self.list_scroll_offset + visible_stories {
+            // Selected item is below visible area, scroll down
+            self.list_scroll_offset = self.list_selected_index.saturating_sub(visible_stories - 1);
+        }
+
+        // Ensure we don't scroll past the end
+        let max_scroll = self.all_stories_list.len().saturating_sub(visible_stories);
+        if self.list_scroll_offset > max_scroll {
+            self.list_scroll_offset = max_scroll;
+        }
+    }
+
+    pub fn next(&mut self) {
+        if self.list_view_mode {
+            // List view navigation
+            if !self.all_stories_list.is_empty() {
+                self.list_selected_index = (self.list_selected_index + 1) % self.all_stories_list.len();
+                // Scroll will be updated in the draw function based on visible area
+            }
+        } else {
+            // Column view navigation
+            if self.workflow_states.is_empty() {
+                return;
+            }
+            
+            let state_id = self.workflow_states[self.selected_column].0;
+            if let Some(stories) = self.stories_by_state.get(&state_id) {
+                if !stories.is_empty() {
+                    self.selected_row = (self.selected_row + 1) % stories.len();
+                }
             }
         }
     }
 
     pub fn previous(&mut self) {
-        if self.workflow_states.is_empty() {
-            return;
-        }
-        
-        let state_id = self.workflow_states[self.selected_column].0;
-        if let Some(stories) = self.stories_by_state.get(&state_id) {
-            if !stories.is_empty() {
-                if self.selected_row == 0 {
-                    self.selected_row = stories.len() - 1;
+        if self.list_view_mode {
+            // List view navigation
+            if !self.all_stories_list.is_empty() {
+                if self.list_selected_index == 0 {
+                    self.list_selected_index = self.all_stories_list.len() - 1;
                 } else {
-                    self.selected_row -= 1;
+                    self.list_selected_index -= 1;
+                }
+                // Scroll will be updated in the draw function based on visible area
+            }
+        } else {
+            // Column view navigation
+            if self.workflow_states.is_empty() {
+                return;
+            }
+            
+            let state_id = self.workflow_states[self.selected_column].0;
+            if let Some(stories) = self.stories_by_state.get(&state_id) {
+                if !stories.is_empty() {
+                    if self.selected_row == 0 {
+                        self.selected_row = stories.len() - 1;
+                    } else {
+                        self.selected_row -= 1;
+                    }
                 }
             }
         }
@@ -274,13 +348,19 @@ impl App {
     }
     
     pub fn get_selected_story(&self) -> Option<&Story> {
-        if self.workflow_states.is_empty() {
-            return None;
+        if self.list_view_mode {
+            // List view mode
+            self.all_stories_list.get(self.list_selected_index)
+        } else {
+            // Column view mode
+            if self.workflow_states.is_empty() {
+                return None;
+            }
+            
+            let state_id = self.workflow_states[self.selected_column].0;
+            self.stories_by_state.get(&state_id)
+                .and_then(|stories| stories.get(self.selected_row))
         }
-        
-        let state_id = self.workflow_states[self.selected_column].0;
-        self.stories_by_state.get(&state_id)
-            .and_then(|stories| stories.get(self.selected_row))
     }
 
     pub fn toggle_state_selector(&mut self) {
@@ -428,8 +508,16 @@ impl App {
                 // Regular navigation (less specific patterns)
                 KeyCode::Char('j') | KeyCode::Down => self.next(),
                 KeyCode::Char('k') | KeyCode::Up => self.previous(),
-                KeyCode::Char('l') | KeyCode::Right => self.next_column(),
-                KeyCode::Char('h') | KeyCode::Left => self.previous_column(),
+                KeyCode::Char('l') | KeyCode::Right => {
+                    if !self.list_view_mode {
+                        self.next_column();
+                    }
+                },
+                KeyCode::Char('h') | KeyCode::Left => {
+                    if !self.list_view_mode {
+                        self.previous_column();
+                    }
+                },
                 KeyCode::Enter => self.toggle_detail(),
                 KeyCode::Char(' ') => self.toggle_state_selector(),
                 KeyCode::Char('o') => {
@@ -444,6 +532,10 @@ impl App {
                 KeyCode::Char('n') => {
                     // Load more stories (next page)
                     self.request_load_more();
+                }
+                KeyCode::Char('v') => {
+                    // Toggle view mode between columns and list
+                    self.toggle_view_mode();
                 }
                 _ => {}
             }
@@ -528,6 +620,13 @@ impl App {
             }
         }
         
+        // Rebuild the flattened list for list view
+        self.all_stories_list.clear();
+        for stories in self.stories_by_state.values() {
+            self.all_stories_list.extend(stories.iter().cloned());
+        }
+        self.all_stories_list.sort_by_key(|s| s.position);
+        
         // Update pagination state
         self.next_page_token = next_page_token;
         self.total_loaded_stories += actually_added;
@@ -547,7 +646,7 @@ impl App {
     }
 }
 
-pub fn draw(frame: &mut Frame, app: &App) {
+pub fn draw(frame: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -564,170 +663,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(header, chunks[0]);
 
-    // Create columns for workflow states
-    if !app.workflow_states.is_empty() {
-        let num_columns = app.workflow_states.len();
-        let column_constraints: Vec<Constraint> = (0..num_columns)
-            .map(|_| Constraint::Percentage((100 / num_columns) as u16))
-            .collect();
-        
-        let columns = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints(column_constraints)
-            .split(chunks[1]);
-        
-        // Render each workflow state column
-        for (idx, (state_id, state_name)) in app.workflow_states.iter().enumerate() {
-            let is_selected_column = idx == app.selected_column;
-            
-            // Get the actual column width
-            let column_rect = columns[idx];
-            // Account for borders (2) and some padding (2)
-            let available_width = column_rect.width.saturating_sub(4) as usize;
-            
-            // Get stories for this state
-            let stories = app.stories_by_state.get(state_id)
-                .map(|s| s.as_slice())
-                .unwrap_or(&[]);
-            
-            // Create list items
-            let items: Vec<ListItem> = stories.iter().enumerate()
-                .map(|(story_idx, story)| {
-                    // Check if story is owned by current user
-                    let is_owned = app.current_user_id.as_ref()
-                        .map(|uid| story.owner_ids.contains(uid))
-                        .unwrap_or(false);
-                    
-                    let style = if is_selected_column && story_idx == app.selected_row {
-                        Style::default()
-                            .bg(Color::DarkGray)
-                            .fg(if is_owned { Color::Cyan } else { Color::White })
-                            .add_modifier(Modifier::BOLD)
-                    } else if is_owned {
-                        // Owned stories show in cyan
-                        Style::default().fg(Color::Cyan)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-                    
-                    // Get icon for story type
-                    let type_icon = match story.story_type.as_str() {
-                        "feature" => "✨",
-                        "bug" => "🐛",
-                        "chore" => "🔧",
-                        _ => "📝",
-                    };
-                    
-                    // Create prefix for first line
-                    let prefix = format!("[#{}] {} ", story.id, type_icon);
-                    
-                    // Calculate available width for text based on actual column width
-                    let first_line_width = available_width.saturating_sub(prefix.len());
-                    let second_line_width = available_width;
-                    
-                    // Handle story name wrapping
-                    let mut line1_text = prefix.clone();
-                    let mut line2_text = String::new();
-                    
-                    if story.name.len() <= first_line_width {
-                        // Fits on one line
-                        line1_text.push_str(&story.name);
-                    } else {
-                        // Try to wrap at word boundaries
-                        let words: Vec<&str> = story.name.split_whitespace().collect();
-                        
-                        if !words.is_empty() {
-                            // Check if even the first word fits
-                            if words[0].len() > first_line_width {
-                                // First word is too long, put entire name on second line
-                                // But truncate if it's too long for the second line too
-                                if story.name.len() > second_line_width {
-                                    line2_text = story.name.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
-                                } else {
-                                    line2_text = story.name.clone();
-                                }
-                            } else {
-                                // Normal word wrapping
-                                let mut current_length = 0;
-                                let mut on_second_line = false;
-                                
-                                for (i, word) in words.iter().enumerate() {
-                                    let word_len = word.len() + if i > 0 { 1 } else { 0 }; // +1 for space
-                                    
-                                    if !on_second_line && current_length + word_len <= first_line_width {
-                                        if i > 0 {
-                                            line1_text.push(' ');
-                                        }
-                                        line1_text.push_str(word);
-                                        current_length += word_len;
-                                    } else if !on_second_line {
-                                        // Moving to second line
-                                        on_second_line = true;
-                                        if word_len <= second_line_width {
-                                            line2_text.push_str(word);
-                                            current_length = word_len;
-                                        } else {
-                                            // Word is too long for second line, truncate
-                                            line2_text = word.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
-                                            break;
-                                        }
-                                    } else {
-                                        // Already on second line
-                                       if current_length + word_len < second_line_width {
-                                            line2_text.push(' ');
-                                            line2_text.push_str(word);
-                                            current_length += word_len + 1;
-                                        } else {
-                                            // No more room, add ellipsis
-                                            if line2_text.len() + 3 <= second_line_width {
-                                                line2_text.push_str("...");
-                                            } else {
-                                                line2_text = line2_text.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Create lines
-                    let line1 = Line::from(Span::styled(line1_text, style));
-                    let line2 = if line2_text.trim().is_empty() {
-                        Line::from(Span::styled("", style))
-                    } else {
-                        Line::from(Span::styled(line2_text, style))
-                    };
-                    
-                    let text = Text::from(vec![line1, line2]);
-                    ListItem::new(text)
-                })
-                .collect();
-            
-            // Column title style
-            let title_style = if is_selected_column {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
-            
-            let title = format!(" {} ({}) ", state_name, stories.len());
-            
-            let list = List::new(items)
-                .block(Block::default()
-                    .borders(Borders::ALL)
-                    .title(title)
-                    .title_style(title_style));
-            
-            frame.render_widget(list, columns[idx]);
-        }
+    if app.list_view_mode {
+        // List view mode - single column with all stories
+        draw_list_view(frame, app, chunks[1]);
     } else {
-        // No stories
-        let empty = Paragraph::new("No stories found")
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::ALL));
-        frame.render_widget(empty, chunks[1]);
+        // Column view mode - columns for workflow states
+        draw_column_view(frame, app, chunks[1]);
     }
 
     // Footer
@@ -737,10 +678,20 @@ pub fn draw(frame: &mut Frame, app: &App) {
         "[↑/k] [↓/j] scroll | [Esc] close detail | [q] quit".to_string()
     } else if app.is_loading {
         format!("Loading more stories... | {} stories loaded", app.total_loaded_stories)
-    } else if app.has_more_stories() {
-        format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+    } else if app.list_view_mode {
+        // List view mode footer
+        if app.has_more_stories() {
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] column view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+        } else {
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] column view | [q] quit | {} stories loaded", app.total_loaded_stories)
+        }
     } else {
-        format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [q] quit | {} stories loaded", app.total_loaded_stories)  
+        // Column view mode footer
+        if app.has_more_stories() {
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] list view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+        } else {
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] list view | [q] quit | {} stories loaded", app.total_loaded_stories)
+        }
     };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(Color::DarkGray))
@@ -1032,6 +983,287 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
     frame.render_widget(help, chunks[4]);
+}
+
+fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
+    if app.all_stories_list.is_empty() {
+        // No stories
+        let empty = Paragraph::new("No stories found")
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL));
+        frame.render_widget(empty, area);
+        return;
+    }
+
+    // Calculate visible area and update scroll
+    let content_height = area.height.saturating_sub(2) as usize; // Account for borders
+    app.update_list_scroll(content_height);
+
+    // Calculate which stories to show
+    let visible_stories = content_height / 2; // Each story takes 2 lines
+    let start_idx = app.list_scroll_offset;
+    let end_idx = (start_idx + visible_stories).min(app.all_stories_list.len());
+    
+    // Available width for text content
+    let available_width = area.width.saturating_sub(4) as usize;
+
+    // Create list items for visible stories only
+    let items: Vec<ListItem> = app.all_stories_list[start_idx..end_idx].iter().enumerate()
+        .map(|(relative_idx, story)| {
+            let story_idx = start_idx + relative_idx;
+            // Check if story is owned by current user
+            let is_owned = app.current_user_id.as_ref()
+                .map(|uid| story.owner_ids.contains(uid))
+                .unwrap_or(false);
+            
+            let is_selected = story_idx == app.list_selected_index;
+            
+            let style = if is_selected {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(if is_owned { Color::Cyan } else { Color::White })
+                    .add_modifier(Modifier::BOLD)
+            } else if is_owned {
+                // Owned stories show in cyan
+                Style::default().fg(Color::Cyan)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            
+            // Get icon for story type
+            let type_icon = match story.story_type.as_str() {
+                "feature" => "✨",
+                "bug" => "🐛",
+                "chore" => "🔧",
+                _ => "📝",
+            };
+            
+            // Get state name
+            let state_name = app.workflow_state_map.get(&story.workflow_state_id)
+                .map(|s| s.as_str())
+                .unwrap_or("Unknown");
+            
+            // Create first line with story info
+            let prefix = format!("[#{}] {} [{}] ", story.id, type_icon, state_name);
+            let first_line_width = available_width.saturating_sub(prefix.len());
+            
+            let mut line1_text = prefix.clone();
+            let mut line2_text = String::new();
+            
+            if story.name.len() <= first_line_width {
+                // Story name fits on first line
+                line1_text.push_str(&story.name);
+            } else {
+                // Story name needs to wrap to second line
+                line2_text = if story.name.len() > available_width {
+                    story.name.chars().take(available_width.saturating_sub(3)).collect::<String>() + "..."
+                } else {
+                    story.name.clone()
+                };
+            }
+            
+            // Create lines
+            let line1 = Line::from(Span::styled(line1_text, style));
+            let line2 = if line2_text.trim().is_empty() {
+                Line::from(Span::styled("", style))
+            } else {
+                Line::from(Span::styled(line2_text, style))
+            };
+            
+            let text = Text::from(vec![line1, line2]);
+            ListItem::new(text)
+        })
+        .collect();
+    
+    // Create title with scroll indicators
+    let visible_stories = content_height / 2;
+    let has_scroll = app.all_stories_list.len() > visible_stories;
+    let title = if has_scroll {
+        let total_stories = app.all_stories_list.len();
+        let showing_start = start_idx + 1;
+        let showing_end = end_idx;
+        format!(" All Stories ({}) - List View ({}-{} of {}) ", 
+            total_stories, showing_start, showing_end, total_stories)
+    } else {
+        format!(" All Stories ({}) - List View ", app.all_stories_list.len())
+    };
+    let title_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+    
+    let list = List::new(items)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .title_style(title_style));
+    
+    frame.render_widget(list, area);
+}
+
+fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
+    // Create columns for workflow states
+    if !app.workflow_states.is_empty() {
+        let num_columns = app.workflow_states.len();
+        let column_constraints: Vec<Constraint> = (0..num_columns)
+            .map(|_| Constraint::Percentage((100 / num_columns) as u16))
+            .collect();
+        
+        let columns = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(column_constraints)
+            .split(area);
+        
+        // Render each workflow state column
+        for (idx, (state_id, state_name)) in app.workflow_states.iter().enumerate() {
+            let is_selected_column = idx == app.selected_column;
+            
+            // Get the actual column width
+            let column_rect = columns[idx];
+            // Account for borders (2) and some padding (2)
+            let available_width = column_rect.width.saturating_sub(4) as usize;
+            
+            // Get stories for this state
+            let stories = app.stories_by_state.get(state_id)
+                .map(|s| s.as_slice())
+                .unwrap_or(&[]);
+            
+            // Create list items
+            let items: Vec<ListItem> = stories.iter().enumerate()
+                .map(|(story_idx, story)| {
+                    // Check if story is owned by current user
+                    let is_owned = app.current_user_id.as_ref()
+                        .map(|uid| story.owner_ids.contains(uid))
+                        .unwrap_or(false);
+                    
+                    let style = if is_selected_column && story_idx == app.selected_row {
+                        Style::default()
+                            .bg(Color::DarkGray)
+                            .fg(if is_owned { Color::Cyan } else { Color::White })
+                            .add_modifier(Modifier::BOLD)
+                    } else if is_owned {
+                        // Owned stories show in cyan
+                        Style::default().fg(Color::Cyan)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+                    
+                    // Get icon for story type
+                    let type_icon = match story.story_type.as_str() {
+                        "feature" => "✨",
+                        "bug" => "🐛",
+                        "chore" => "🔧",
+                        _ => "📝",
+                    };
+                    
+                    // Create prefix for first line
+                    let prefix = format!("[#{}] {} ", story.id, type_icon);
+                    
+                    // Calculate available width for text based on actual column width
+                    let first_line_width = available_width.saturating_sub(prefix.len());
+                    let second_line_width = available_width;
+                    
+                    // Handle story name wrapping
+                    let mut line1_text = prefix.clone();
+                    let mut line2_text = String::new();
+                    
+                    if story.name.len() <= first_line_width {
+                        // Fits on one line
+                        line1_text.push_str(&story.name);
+                    } else {
+                        // Try to wrap at word boundaries
+                        let words: Vec<&str> = story.name.split_whitespace().collect();
+                        
+                        if !words.is_empty() {
+                            // Check if even the first word fits
+                            if words[0].len() > first_line_width {
+                                // First word is too long, put entire name on second line
+                                // But truncate if it's too long for the second line too
+                                if story.name.len() > second_line_width {
+                                    line2_text = story.name.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                } else {
+                                    line2_text = story.name.clone();
+                                }
+                            } else {
+                                // Normal word wrapping
+                                let mut current_length = 0;
+                                let mut on_second_line = false;
+                                
+                                for (i, word) in words.iter().enumerate() {
+                                    let word_len = word.len() + if i > 0 { 1 } else { 0 }; // +1 for space
+                                    
+                                    if !on_second_line && current_length + word_len <= first_line_width {
+                                        if i > 0 {
+                                            line1_text.push(' ');
+                                        }
+                                        line1_text.push_str(word);
+                                        current_length += word_len;
+                                    } else if !on_second_line {
+                                        // Moving to second line
+                                        on_second_line = true;
+                                        if word_len <= second_line_width {
+                                            line2_text.push_str(word);
+                                            current_length = word_len;
+                                        } else {
+                                            // Word is too long for second line, truncate
+                                            line2_text = word.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                            break;
+                                        }
+                                    } else {
+                                        // Already on second line
+                                       if current_length + word_len < second_line_width {
+                                            line2_text.push(' ');
+                                            line2_text.push_str(word);
+                                            current_length += word_len + 1;
+                                        } else {
+                                            // No more room, add ellipsis
+                                            if line2_text.len() + 3 <= second_line_width {
+                                                line2_text.push_str("...");
+                                            } else {
+                                                line2_text = line2_text.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Create lines
+                    let line1 = Line::from(Span::styled(line1_text, style));
+                    let line2 = if line2_text.trim().is_empty() {
+                        Line::from(Span::styled("", style))
+                    } else {
+                        Line::from(Span::styled(line2_text, style))
+                    };
+                    
+                    let text = Text::from(vec![line1, line2]);
+                    ListItem::new(text)
+                })
+                .collect();
+            
+            // Column title style
+            let title_style = if is_selected_column {
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
+            
+            let title = format!(" {} ({}) ", state_name, stories.len());
+            
+            let list = List::new(items)
+                .block(Block::default()
+                    .borders(Borders::ALL)
+                    .title(title)
+                    .title_style(title_style));
+            
+            frame.render_widget(list, columns[idx]);
+        }
+    } else {
+        // No stories
+        let empty = Paragraph::new("No stories found")
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL));
+        frame.render_widget(empty, area);
+    }
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

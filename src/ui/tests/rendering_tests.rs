@@ -43,11 +43,11 @@ mod tests {
 
     #[test]
     fn test_render_main_view() {
-        let app = create_test_app();
+        let mut app = create_test_app();
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| draw(f, &app)).unwrap();
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
         
@@ -89,7 +89,7 @@ mod tests {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| draw(f, &app)).unwrap();
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
         
@@ -125,12 +125,12 @@ mod tests {
     fn test_render_empty_list() {
         let stories = vec![];
         let workflows = vec![];
-        let app = App::new(stories, workflows, "test query".to_string(), None);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| draw(f, &app)).unwrap();
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
         
@@ -208,12 +208,12 @@ mod tests {
                 ],
             },
         ];
-        let app = App::new(stories, workflows, "test query".to_string(), None);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| draw(f, &app)).unwrap();
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
         
@@ -289,12 +289,12 @@ mod tests {
             },
         ];
         
-        let app = App::new(stories, workflows, "test query".to_string(), None);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| draw(f, &app)).unwrap();
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
         
@@ -379,7 +379,7 @@ mod tests {
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
 
-        terminal.draw(|f| draw(f, &app)).unwrap();
+        terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
         

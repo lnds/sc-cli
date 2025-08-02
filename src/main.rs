@@ -530,7 +530,7 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
     let mut terminal = Terminal::new(backend)?;
 
     loop {
-        terminal.draw(|f| ui::draw(f, &app))?;
+        terminal.draw(|f| ui::draw(f, &mut app))?;
 
         if crossterm::event::poll(std::time::Duration::from_millis(50))? {
             if let crossterm::event::Event::Key(key) = crossterm::event::read()? {

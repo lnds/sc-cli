@@ -703,7 +703,7 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
 
             // Add comment text with proper line wrapping
             for line in comment.text.lines() {
-                text_lines.push(Line::from(format!("  {}", line)));
+                text_lines.push(Line::from(format!("  {line}")));
             }
             text_lines.push(Line::from(""));
         }

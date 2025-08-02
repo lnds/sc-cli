@@ -20,8 +20,22 @@ use ui::App;
 fn validate_story_type(s: &str) -> Result<String, String> {
     match s {
         "feature" | "bug" | "chore" => Ok(s.to_string()),
-        _ => Err(format!("Invalid story type '{}'. Must be one of: feature, bug, chore", s)),
+        _ => Err(format!("Invalid story type '{s}'. Must be one of: feature, bug, chore")),
     }
+}
+
+#[derive(Debug)]
+struct ViewCommandArgs {
+    workspace: Option<String>,
+    username: Option<String>,
+    token: Option<String>,
+    limit: Option<usize>,
+    story_type: Option<String>,
+    search: Option<String>,
+    all: bool,
+    _owner: bool,
+    requester: bool,
+    debug: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -98,11 +112,33 @@ fn main() -> Result<()> {
             handle_add_command(args.workspace, token, name, r#type, args.debug)
         }
         Some(Command::View { username, token, limit, story_type, search, all, owner, requester }) => {
-            handle_view_command(args.workspace, username, token, limit, story_type, search, all, owner, requester, args.debug)
+            handle_view_command(ViewCommandArgs {
+                workspace: args.workspace,
+                username,
+                token,
+                limit,
+                story_type,
+                search,
+                all,
+                _owner: owner,
+                requester,
+                debug: args.debug,
+            })
         }
         None => {
             // Default to view command when no subcommand is specified
-            handle_view_command(args.workspace, None, None, None, None, None, false, false, false, args.debug)
+            handle_view_command(ViewCommandArgs {
+                workspace: args.workspace,
+                username: None,
+                token: None,
+                limit: None,
+                story_type: None,
+                search: None,
+                all: false,
+                _owner: false,
+                requester: false,
+                debug: args.debug,
+            })
         }
     }
 }
@@ -164,7 +200,7 @@ fn handle_add_command(workspace: Option<String>, token: Option<String>, name: Ve
         .ok_or_else(|| anyhow::anyhow!("No workflows found in the workspace"))?;
     
     if debug {
-        eprintln!("Using workflow state ID: {}", workflow_state_id);
+        eprintln!("Using workflow state ID: {workflow_state_id}");
     }
 
     // Convert name vector to optional string
@@ -197,27 +233,16 @@ fn handle_add_command(workspace: Option<String>, token: Option<String>, name: Ve
 }
 
 
-fn handle_view_command(
-    workspace: Option<String>, 
-    username: Option<String>, 
-    token: Option<String>, 
-    limit: Option<usize>, 
-    story_type: Option<String>, 
-    search: Option<String>, 
-    all: bool, 
-    _owner: bool, 
-    requester: bool,
-    debug: bool
-) -> Result<()> {
+fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
     // Get token, username, and fetch_limit from args or config
-    let (token, username, config_limit) = if let Some(workspace_name) = workspace {
+    let (token, username, config_limit) = if let Some(workspace_name) = args.workspace {
         // Use explicitly specified workspace
         let (config, _created) = Config::load_or_create(&workspace_name)
             .context("Failed to load or create config")?;
         let workspace = config.get_workspace(&workspace_name)
             .context(format!("Failed to get workspace '{workspace_name}'"))?;
         (workspace.api_key.clone(), workspace.user_id.clone(), workspace.fetch_limit)
-    } else if token.is_none() && username.is_none() {
+    } else if args.token.is_none() && args.username.is_none() {
         // No args provided, try to use default workspace
         match Config::load() {
             Ok(config) => {
@@ -235,22 +260,22 @@ fn handle_view_command(
         }
     } else {
         // Use command line arguments with default limit
-        let token = token
+        let token = args.token
             .ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?;
-        let username = username
+        let username = args.username
             .ok_or_else(|| anyhow::anyhow!("Either username or --workspace must be provided"))?;
         (token, username, 20) // Default limit when not using workspace
     };
     
     // Use command-line limit if provided, otherwise use workspace config limit
-    let limit = limit.unwrap_or(config_limit);
+    let limit = args.limit.unwrap_or(config_limit);
 
     // Initialize API client
-    let client = ShortcutClient::new(token, debug)
+    let client = ShortcutClient::new(token, args.debug)
         .context("Failed to create Shortcut client")?;
 
     // Get workflows
-    if debug {
+    if args.debug {
         eprintln!("Fetching workflows...");
     }
     let workflows = client
@@ -258,22 +283,22 @@ fn handle_view_command(
         .context("Failed to fetch workflows")?;
 
     // Build search query
-    let query = if let Some(search) = search {
+    let query = if let Some(search) = args.search {
         search
     } else {
         let mut query_parts = vec![];
         
         // Apply filter based on flags (default to owner if none specified)
-        if all {
+        if args.all {
             // No user filter for --all flag
-        } else if requester {
+        } else if args.requester {
             query_parts.push(format!("requester:{username}"));
         } else {
             // Default to owner filter (also when --owner is explicitly used)
             query_parts.push(format!("owner:{username}"));
         }
         
-        if let Some(story_type) = story_type {
+        if let Some(story_type) = args.story_type {
             query_parts.push(format!("type:{story_type}"));
         }
         
@@ -282,7 +307,7 @@ fn handle_view_command(
     };
 
     // Search for stories
-    if debug {
+    if args.debug {
         eprintln!("Searching for stories...");
         eprintln!("Query: {query}");
     }
@@ -296,22 +321,22 @@ fn handle_view_command(
         return Ok(());
     }
 
-    if debug {
+    if args.debug {
         eprintln!("Found {} stories", stories.len());
     }
 
     // Fetch members to populate cache BEFORE setting up terminal
     let mut member_cache = HashMap::new();
-    if debug {
+    if args.debug {
         eprintln!("Fetching members for cache...");
     }
     match client.get_members() {
         Ok(members) => {
-            if debug {
+            if args.debug {
                 eprintln!("Fetched {} members from API", members.len());
             }
             for member in members {
-                if debug {
+                if args.debug {
                     eprintln!("Caching member: id='{}', name='{}', mention_name='{}'", 
                         member.id, member.profile.name, member.profile.mention_name);
                 }
@@ -319,7 +344,7 @@ fn handle_view_command(
                 let display_name = format!("{} ({})", member.profile.name, member.profile.mention_name);
                 member_cache.insert(member.id, display_name);
             }
-            if debug {
+            if args.debug {
                 eprintln!("Cached {} members", member_cache.len());
                 // Also show some story owner IDs for comparison
                 if !stories.is_empty() {
@@ -334,7 +359,7 @@ fn handle_view_command(
         }
         Err(e) => {
             eprintln!("WARNING: Failed to fetch members for cache: {e}");
-            if debug {
+            if args.debug {
                 eprintln!("Full error: {e:?}");
             }
             eprintln!("Owner names will be displayed as IDs");
@@ -353,18 +378,18 @@ fn handle_view_command(
     }
     
     // Try to get current user ID to highlight owned stories
-    if debug {
+    if args.debug {
         eprintln!("Fetching current user for story highlighting...");
     }
     match client.get_current_member() {
         Ok(member) => {
-            if debug {
+            if args.debug {
                 eprintln!("Current user: {} ({}) - ID: {}", member.name, member.mention_name, member.id);
             }
             app.set_current_user_id(member.id);
         }
         Err(e) => {
-            if debug {
+            if args.debug {
                 eprintln!("Failed to get current user for highlighting: {e}");
                 eprintln!("Owned stories will not be highlighted");
             }

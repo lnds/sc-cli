@@ -29,6 +29,12 @@ pub struct App {
     pub selected_row: usize,
     pub stories_by_state: HashMap<i64, Vec<Story>>,
     pub workflow_states: Vec<(i64, String)>,
+    // Pagination state
+    pub search_query: String, // Store the current search query
+    pub next_page_token: Option<String>, // Token for the next page
+    pub load_more_requested: bool, // Flag to request loading more stories
+    pub is_loading: bool, // Flag to show loading state
+    pub total_loaded_stories: usize, // Count of total stories loaded
 }
 
 #[derive(Debug, Clone)]
@@ -60,7 +66,7 @@ impl Default for CreatePopupState {
 }
 
 impl App {
-    pub fn new(stories: Vec<Story>, workflows: Vec<Workflow>) -> Self {
+    pub fn new(stories: Vec<Story>, workflows: Vec<Workflow>, search_query: String, next_page_token: Option<String>) -> Self {
         // Group stories by workflow state
         let mut stories_by_state: HashMap<i64, Vec<Story>> = HashMap::new();
         for story in stories.iter() {
@@ -108,6 +114,8 @@ impl App {
             }
         }
 
+        let total_stories = stories.len();
+        
         Self {
             show_detail: false,
             show_state_selector: false,
@@ -125,6 +133,11 @@ impl App {
             selected_row: 0,
             stories_by_state,
             workflow_states,
+            search_query,
+            next_page_token,
+            load_more_requested: false,
+            is_loading: false,
+            total_loaded_stories: total_stories,
         }
     }
 
@@ -359,6 +372,10 @@ impl App {
                     self.show_create_popup = true;
                     self.create_popup_state = CreatePopupState::default();
                 }
+                KeyCode::Char('n') => {
+                    // Load more stories (next page)
+                    self.request_load_more();
+                }
                 _ => {}
             }
         }
@@ -394,6 +411,45 @@ impl App {
         if self.detail_scroll_offset > 0 {
             self.detail_scroll_offset -= 1;
         }
+    }
+
+    pub fn merge_stories(&mut self, new_stories: Vec<Story>, next_page_token: Option<String>) {
+        let mut actually_added = 0;
+        
+        // Add new stories to existing state buckets, avoiding duplicates
+        for story in new_stories.iter() {
+            let state_stories = self.stories_by_state
+                .entry(story.workflow_state_id)
+                .or_default();
+            
+            // Check if story already exists (by ID)
+            if !state_stories.iter().any(|existing| existing.id == story.id) {
+                state_stories.push(story.clone());
+                actually_added += 1;
+            }
+        }
+        
+        // Sort stories within each state by position
+        for stories in self.stories_by_state.values_mut() {
+            stories.sort_by_key(|s| s.position);
+        }
+        
+        // Update pagination state
+        self.next_page_token = next_page_token;
+        self.total_loaded_stories += actually_added;
+        self.is_loading = false;
+        self.load_more_requested = false;
+    }
+
+    pub fn request_load_more(&mut self) {
+        if self.next_page_token.is_some() && !self.is_loading {
+            self.load_more_requested = true;
+            self.is_loading = true;
+        }
+    }
+
+    pub fn has_more_stories(&self) -> bool {
+        self.next_page_token.is_some()
     }
 }
 
@@ -582,11 +638,15 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     // Footer
     let footer_text = if app.show_state_selector {
-        "[↑/k] [↓/j] select state | [Enter] confirm | [Esc] cancel"
+        "[↑/k] [↓/j] select state | [Enter] confirm | [Esc] cancel".to_string()
     } else if app.show_detail {
-        "[↑/k] [↓/j] scroll | [Esc] close detail | [q] quit"
+        "[↑/k] [↓/j] scroll | [Esc] close detail | [q] quit".to_string()
+    } else if app.is_loading {
+        format!("Loading more stories... | {} stories loaded", app.total_loaded_stories)
+    } else if app.has_more_stories() {
+        format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
     } else {
-        "[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [q] quit"
+        format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [q] quit | {} stories loaded", app.total_loaded_stories)  
     };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(Color::DarkGray))

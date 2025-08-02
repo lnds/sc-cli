@@ -23,7 +23,7 @@ pub struct WorkspaceConfig {
 }
 
 fn default_fetch_limit() -> usize {
-    20
+    50
 }
 
 impl Config {
@@ -119,7 +119,7 @@ impl Config {
         
         let fetch_limit: usize = Input::new()
             .with_prompt("Enter the default number of stories to fetch")
-            .default(20)
+            .default(50)
             .interact_text()?;
             
         Ok(WorkspaceConfig { api_key, user_id, fetch_limit })
@@ -251,7 +251,7 @@ default_workspace = "personal"
 [personal]
 api_key = "your-personal-api-key"
 user_id = "your-mention-name"
-fetch_limit = 20  # Optional: defaults to 20 if not specified
+fetch_limit = 50  # Optional: defaults to 50 if not specified
 
 # Configuration for 'work' workspace  
 [work]
@@ -263,7 +263,7 @@ fetch_limit = 50  # Fetch more stories for work workspace
 [client]
 api_key = "your-client-api-key"
 user_id = "your-client-mention-name"
-# fetch_limit not specified, will use default of 20
+# fetch_limit not specified, will use default of 50
 "#.to_string()
     }
 }
@@ -301,7 +301,7 @@ user_id = "prod.user"
         let prod_workspace = config.get_workspace("prod").unwrap();
         assert_eq!(prod_workspace.api_key, "prod-key");
         assert_eq!(prod_workspace.user_id, "prod.user");
-        assert_eq!(prod_workspace.fetch_limit, 20); // Default value
+        assert_eq!(prod_workspace.fetch_limit, 50); // Default value
     }
     
     #[test]
@@ -420,7 +420,7 @@ user_id = "user2"
 "#;
         let config: Config = toml::from_str(config_content).unwrap();
         let workspace = config.get_workspace("workspace2").unwrap();
-        assert_eq!(workspace.fetch_limit, 20);
+        assert_eq!(workspace.fetch_limit, 50);
         
         // Test with zero fetch_limit
         let config_content = r#"

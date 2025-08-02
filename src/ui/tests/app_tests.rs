@@ -84,7 +84,7 @@ mod tests {
     fn test_app_creation() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let app = App::new(stories.clone(), workflows);
+        let app = App::new(stories.clone(), workflows, "test query".to_string(), None);
 
         assert_eq!(app.selected_column, 0);
         assert_eq!(app.selected_row, 0);
@@ -99,7 +99,7 @@ mod tests {
     fn test_app_creation_empty_stories() {
         let stories = vec![];
         let workflows = create_test_workflows();
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should show all workflow states even with no stories
         assert_eq!(app.workflow_states.len(), 3);
@@ -110,7 +110,7 @@ mod tests {
     fn test_navigation_next() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         // We have 3 stories, each in different workflow state
         // The app should have 3 columns, one for each state
@@ -133,7 +133,7 @@ mod tests {
     fn test_navigation_previous() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Start at column 0, row 0
         assert_eq!(app.selected_column, 0);
@@ -159,7 +159,7 @@ mod tests {
     fn test_navigation_empty_stories() {
         let stories = vec![];
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should not crash on empty list
         app.next();
@@ -188,7 +188,7 @@ mod tests {
     fn test_toggle_detail() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         assert!(!app.show_detail);
 
@@ -205,7 +205,7 @@ mod tests {
     fn test_toggle_detail_empty_stories() {
         let stories = vec![];
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should not toggle on empty list
         app.toggle_detail();
@@ -216,7 +216,7 @@ mod tests {
     fn test_set_current_user_id() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Initially no current user
         assert_eq!(app.current_user_id, None);
@@ -288,7 +288,7 @@ mod tests {
             }],
         }];
         
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
         
         // Check that stories are sorted by position
         let sorted_stories = app.stories_by_state.get(&10).unwrap();
@@ -302,7 +302,7 @@ mod tests {
     fn test_create_story_popup() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
         
         // Initially popup should not be shown
         assert!(!app.show_create_popup);
@@ -354,7 +354,7 @@ mod tests {
     fn test_detail_scroll_functionality() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
         
         // Initially scroll offset should be 0
         assert_eq!(app.detail_scroll_offset, 0);
@@ -451,7 +451,7 @@ mod tests {
             ],
         }];
 
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should select column 1 (second workflow state) since first is empty
         assert_eq!(app.selected_column, 1);
@@ -501,7 +501,7 @@ mod tests {
             ],
         }];
 
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should select column 0 (first workflow state) since it has stories
         assert_eq!(app.selected_column, 0);
@@ -536,7 +536,7 @@ mod tests {
             ],
         }];
 
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should still select column 0 (fallback behavior)
         assert_eq!(app.selected_column, 0);
@@ -591,7 +591,7 @@ mod tests {
             ],
         }];
 
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should select column 2 (last workflow state) since others are empty
         assert_eq!(app.selected_column, 2);

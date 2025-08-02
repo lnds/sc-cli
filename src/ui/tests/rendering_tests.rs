@@ -35,7 +35,7 @@ mod tests {
             }],
         }];
 
-        App::new(stories, workflows)
+        App::new(stories, workflows, "test query".to_string(), None)
     }
 
     #[test]
@@ -122,7 +122,7 @@ mod tests {
     fn test_render_empty_list() {
         let stories = vec![];
         let workflows = vec![];
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -199,7 +199,7 @@ mod tests {
                 ],
             },
         ];
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -275,7 +275,7 @@ mod tests {
             },
         ];
         
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -353,7 +353,7 @@ mod tests {
             },
         ];
         
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
         // Set current user to highlight owned stories
         app.set_current_user_id("current-user".to_string());
 

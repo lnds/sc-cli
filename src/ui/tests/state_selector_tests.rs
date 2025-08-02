@@ -54,7 +54,7 @@ mod tests {
     fn test_toggle_state_selector() {
         let stories = vec![create_test_story(1, 10)];
         let workflows = vec![create_test_workflow()];
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Initially state selector should be hidden
         assert!(!app.show_state_selector);
@@ -69,7 +69,7 @@ mod tests {
     fn test_toggle_state_selector_empty_column() {
         let stories = vec![];
         let workflows = vec![create_test_workflow()];
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should not show state selector for empty column
         app.toggle_state_selector();
@@ -80,7 +80,7 @@ mod tests {
     fn test_get_available_states_for_story() {
         let stories = vec![create_test_story(1, 10)]; // Story in "To Do" state
         let workflows = vec![create_test_workflow()];
-        let app = App::new(stories, workflows);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         let story = app.get_selected_story().unwrap();
         let available_states = app.get_available_states_for_story(story);
@@ -95,7 +95,7 @@ mod tests {
     fn test_state_selector_navigation() {
         let stories = vec![create_test_story(1, 10)];
         let workflows = vec![create_test_workflow()];
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         app.toggle_state_selector();
         assert_eq!(app.state_selector_index, 0);
@@ -121,7 +121,7 @@ mod tests {
     fn test_get_selected_target_state() {
         let stories = vec![create_test_story(1, 10)]; // Story in "To Do" state
         let workflows = vec![create_test_workflow()];
-        let mut app = App::new(stories, workflows);
+        let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         app.toggle_state_selector();
         

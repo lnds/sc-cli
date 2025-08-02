@@ -119,6 +119,7 @@ user_id = "your.work.mention.name"
 - **Space** - Move story to a different workflow state
 - **o** - Take ownership of the selected story
 - **a** - Add a new story
+- **n** - Load more stories (fetch next page)
 - **Esc** - Close detail view or cancel state selection
 - **q** - Quit the application
 
@@ -153,6 +154,16 @@ When you press **a** in the TUI:
 - Press **Esc** at any time to cancel
 - The story is created with you as the requester
 - The new story appears in the first workflow state (typically "Backlog" or "To Do")
+
+#### Loading More Stories (Pagination)
+
+When you press **n** in the TUI:
+- The application fetches the next page of stories from Shortcut
+- New stories are seamlessly merged into the existing workflow columns
+- The status bar shows the current count of loaded stories
+- The loading state is indicated in the footer while fetching
+- This allows you to load additional stories without restarting the application
+- The feature remembers your search query and continues from where it left off
 
 ### Examples
 
@@ -216,7 +227,7 @@ sc-cli add "Add user profile feature" --type feature -w work
 #### View Command (default)
 - `username` - The Shortcut mention name to search for (optional if using --workspace)
 - `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
-- `--limit` (optional) - Maximum number of stories to display (default: 25)
+- `--limit` (optional) - Maximum number of stories to display (default: 50)
 - `--story-type` (optional) - Filter by story type: feature, bug, chore
 - `--search` (optional) - Custom search query using Shortcut's search syntax
 - `--all` (optional) - Show all stories (no owner/requester filter)

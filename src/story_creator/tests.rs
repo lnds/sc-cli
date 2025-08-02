@@ -34,6 +34,10 @@ mod tests {
             unimplemented!()
         }
 
+        fn search_stories_page(&self, _query: &str, _next_token: Option<String>) -> Result<crate::api::SearchStoriesResult> {
+            unimplemented!()
+        }
+
         fn create_story(&self, _name: String, _description: String, _story_type: String, _requested_by_id: String, _workflow_state_id: i64) -> Result<Story> {
             if self.should_fail {
                 Err(anyhow::anyhow!("API Error"))

@@ -97,8 +97,16 @@ pub struct CurrentMember {
     pub mention_name: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct SearchStoriesResult {
+    pub stories: Vec<Story>,
+    pub next_page_token: Option<String>,
+    pub total: Option<i64>,
+}
+
 pub trait ShortcutApi {
     fn search_stories(&self, query: &str, limit: Option<usize>) -> Result<Vec<Story>>;
+    fn search_stories_page(&self, query: &str, next_token: Option<String>) -> Result<SearchStoriesResult>;
     fn get_workflows(&self) -> Result<Vec<Workflow>>;
     fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story>;
     fn get_current_member(&self) -> Result<CurrentMember>;

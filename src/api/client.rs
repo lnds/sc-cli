@@ -325,4 +325,65 @@ impl ShortcutApi for ShortcutClient {
 
         Ok(created_story)
     }
+
+    fn search_stories_page(&self, query: &str, next_token: Option<String>) -> Result<super::SearchStoriesResult> {
+        let url = format!("{}/search", self.base_url);
+        let page_size = 25; // Maximum allowed by Shortcut API
+        
+        if self.debug {
+            eprintln!("Searching single page with query: {query}");
+            if let Some(ref token) = next_token {
+                eprintln!("Using next token: {token}");
+            }
+        }
+        
+        // Build query parameters
+        let mut params = vec![("query", query.to_string()), ("page_size", page_size.to_string())];
+        if let Some(ref token) = next_token {
+            params.push(("next", token.clone()));
+        }
+        
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .query(&params)
+            .send()
+            .context("Failed to send search request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Response status: {status}");
+        }
+        
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("API request failed with status: {}. Error: {}", status, error_text);
+        }
+
+        let response_text = response.text().context("Failed to read response text")?;
+        if self.debug {
+            eprintln!("Response preview: {}", &response_text.chars().take(500).collect::<String>());
+        }
+        
+        let search_response: super::SearchResponse = serde_json::from_str(&response_text)
+            .context("Failed to parse search response")?;
+
+        let stories_count = search_response.stories.data.len();
+        if self.debug {
+            eprintln!("Found {stories_count} stories in this page");
+            if let Some(total) = search_response.stories.total {
+                eprintln!("Total available stories: {total}");
+            }
+        }
+        
+        // Get next page token
+        let next_page_token = search_response.next.or(search_response.stories.next);
+        
+        Ok(super::SearchStoriesResult {
+            stories: search_response.stories.data,
+            next_page_token,
+            total: search_response.stories.total,
+        })
+    }
 }

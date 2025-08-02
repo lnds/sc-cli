@@ -264,7 +264,7 @@ fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
             .ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?;
         let username = args.username
             .ok_or_else(|| anyhow::anyhow!("Either username or --workspace must be provided"))?;
-        (token, username, 20) // Default limit when not using workspace
+        (token, username, 50) // Default limit when not using workspace
     };
     
     // Use command-line limit if provided, otherwise use workspace config limit
@@ -306,14 +306,57 @@ fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
         query_parts.join(" ")
     };
 
-    // Search for stories
+    // Search for stories - use initial page loading
     if args.debug {
         eprintln!("Searching for stories...");
         eprintln!("Query: {query}");
     }
-    let stories = client
-        .search_stories(&query, Some(limit))
-        .context("Failed to search stories")?;
+    
+    // Load first page initially, but limit to the specified limit
+    let mut stories = Vec::new();
+    let mut next_page_token = None;
+    let mut loaded_count = 0;
+    
+    // Keep loading pages until we reach the limit
+    loop {
+        let search_result = client
+            .search_stories_page(&query, next_page_token)
+            .context("Failed to search stories")?;
+        
+        // Add stories up to the limit, avoiding duplicates
+        let remaining_slots = limit.saturating_sub(loaded_count);
+        let mut added_count = 0;
+        
+        for story in search_result.stories {
+            // Stop if we've reached the limit
+            if added_count >= remaining_slots {
+                break;
+            }
+            
+            // Check for duplicates by ID
+            if !stories.iter().any(|existing: &api::Story| existing.id == story.id) {
+                stories.push(story);
+                added_count += 1;
+            }
+        }
+        
+        loaded_count += added_count;
+        next_page_token = search_result.next_page_token;
+        
+        // Stop if we've reached the limit or there are no more pages
+        if loaded_count >= limit || next_page_token.is_none() {
+            break;
+        }
+        
+        // Safety check: if we didn't add any new stories from this page,
+        // but there are still more pages, we're likely in a duplicate loop
+        if added_count == 0 && next_page_token.is_some() {
+            if args.debug {
+                eprintln!("No new stories added from current page, stopping to prevent infinite loop");
+            }
+            break;
+        }
+    }
 
     if stories.is_empty() {
         eprintln!("No stories found for query: {query}");
@@ -323,6 +366,9 @@ fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
 
     if args.debug {
         eprintln!("Found {} stories", stories.len());
+        if next_page_token.is_some() {
+            eprintln!("More stories available for pagination");
+        }
     }
 
     // Fetch members to populate cache BEFORE setting up terminal
@@ -370,7 +416,7 @@ fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
     setup_terminal()?;
     
     // Create app with stories and workflows
-    let mut app = App::new(stories, workflows.clone());
+    let mut app = App::new(stories, workflows.clone(), query.clone(), next_page_token);
     
     // Populate the member cache in the app
     for (id, name) in member_cache {
@@ -396,7 +442,7 @@ fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
         }
     }
     
-    let result = run_app(app, client, workflows);
+    let result = run_app(app, client, workflows, args.debug);
 
     // Restore terminal
     restore_terminal()?;
@@ -418,7 +464,7 @@ fn restore_terminal() -> Result<()> {
     Ok(())
 }
 
-fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>) -> Result<()> {
+fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, debug: bool) -> Result<()> {
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend)?;
 
@@ -533,6 +579,29 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>) 
             // Reset the popup state
             app.create_popup_state = ui::CreatePopupState::default();
             app.create_story_requested = false;
+        }
+
+        // Check if we need to load more stories
+        if app.load_more_requested {
+            if let Some(ref next_token) = app.next_page_token.clone() {
+                match client.search_stories_page(&app.search_query, Some(next_token.clone())) {
+                    Ok(search_result) => {
+                        if debug {
+                            eprintln!("Loaded {} more stories", search_result.stories.len());
+                        }
+                        // Merge the new stories
+                        app.merge_stories(search_result.stories, search_result.next_page_token);
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to load more stories: {e}");
+                        app.is_loading = false;
+                        app.load_more_requested = false;
+                    }
+                }
+            } else {
+                app.is_loading = false;
+                app.load_more_requested = false;
+            }
         }
 
         if app.should_quit {

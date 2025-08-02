@@ -30,6 +30,10 @@ mod tests {
             unimplemented!()
         }
 
+        fn update_story_details(&self, _story_id: i64, _name: String, _description: String, _story_type: String) -> Result<Story> {
+            unimplemented!()
+        }
+
         fn get_members(&self) -> Result<Vec<Member>> {
             unimplemented!()
         }

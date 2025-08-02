@@ -242,6 +242,48 @@ impl ShortcutApi for ShortcutClient {
         Ok(updated_story)
     }
 
+    fn update_story_details(&self, story_id: i64, name: String, description: String, story_type: String) -> Result<Story> {
+        let url = format!("{}/stories/{}", self.base_url, story_id);
+        
+        let update_payload = serde_json::json!({
+            "name": name,
+            "description": description,
+            "story_type": story_type
+        });
+
+        if self.debug {
+            eprintln!("Updating story {story_id} details: name='{}', description='{}', type='{}'", name, description, story_type);
+        }
+        
+        let response = self
+            .client
+            .put(&url)
+            .headers(self.headers())
+            .json(&update_payload)
+            .send()
+            .context("Failed to send story details update request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Update story details response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to update story details: {}. Error: {}", status, error_text);
+        }
+
+        let updated_story: Story = response
+            .json()
+            .context("Failed to parse updated story response")?;
+
+        if self.debug {
+            eprintln!("Successfully updated story #{} - {}", updated_story.id, updated_story.name);
+        }
+
+        Ok(updated_story)
+    }
+
     fn get_members(&self) -> Result<Vec<Member>> {
         let url = format!("{}/members", self.base_url);
         

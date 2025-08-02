@@ -642,6 +642,38 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
             app.create_story_requested = false;
         }
 
+        // Check if we need to edit a story
+        if app.edit_story_requested && !app.edit_popup_state.name.is_empty() {
+            let story_id = app.edit_popup_state.story_id;
+            let name = app.edit_popup_state.name.clone();
+            let description = app.edit_popup_state.description.clone();
+            let story_type = app.edit_popup_state.story_type.clone();
+            
+            match client.update_story_details(story_id, name, description, story_type) {
+                Ok(updated_story) => {
+                    // Update the story in our local data
+                    update_story_details(&mut app, story_id, updated_story);
+                    if debug {
+                        eprintln!("Successfully updated story #{}", story_id);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to update story: {e}");
+                }
+            }
+            
+            // Reset the edit state
+            app.edit_popup_state = ui::EditPopupState {
+                name: String::new(),
+                description: String::new(),
+                story_type: "feature".to_string(),
+                selected_field: ui::EditField::Name,
+                story_type_index: 0,
+                story_id: 0,
+            };
+            app.edit_story_requested = false;
+        }
+
         // Check if we need to load more stories
         if app.load_more_requested {
             if let Some(ref next_token) = app.next_page_token.clone() {
@@ -707,8 +739,28 @@ fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Stor
     let state_id = updated_story.workflow_state_id;
     if let Some(stories) = app.stories_by_state.get_mut(&state_id) {
         if let Some(pos) = stories.iter().position(|s| s.id == story_id) {
-            stories[pos] = updated_story;
+            stories[pos] = updated_story.clone();
         }
+    }
+    
+    // Also update the story in the all_stories_list for list view
+    if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {
+        app.all_stories_list[pos] = updated_story;
+    }
+}
+
+fn update_story_details(app: &mut App, story_id: i64, updated_story: api::Story) {
+    // Find and update the story in its current state
+    let state_id = updated_story.workflow_state_id;
+    if let Some(stories) = app.stories_by_state.get_mut(&state_id) {
+        if let Some(pos) = stories.iter().position(|s| s.id == story_id) {
+            stories[pos] = updated_story.clone();
+        }
+    }
+    
+    // Also update the story in the all_stories_list for list view
+    if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {
+        app.all_stories_list[pos] = updated_story;
     }
 }
 

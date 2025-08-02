@@ -62,6 +62,9 @@ pub struct App {
     pub create_story_requested: bool,
     pub show_create_popup: bool,
     pub create_popup_state: CreatePopupState,
+    pub edit_story_requested: bool,
+    pub show_edit_popup: bool,
+    pub edit_popup_state: EditPopupState,
     pub workflow_state_map: HashMap<i64, String>,
     pub member_cache: HashMap<String, String>, // owner_id -> name
     pub current_user_id: Option<String>, // ID of current user
@@ -101,6 +104,23 @@ pub enum CreateField {
     Type,
 }
 
+#[derive(Debug, Clone)]
+pub struct EditPopupState {
+    pub name: String,
+    pub description: String,
+    pub story_type: String,
+    pub selected_field: EditField,
+    pub story_type_index: usize,
+    pub story_id: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum EditField {
+    Name,
+    Description,
+    Type,
+}
+
 impl Default for CreatePopupState {
     fn default() -> Self {
         Self {
@@ -109,6 +129,26 @@ impl Default for CreatePopupState {
             story_type: "feature".to_string(),
             selected_field: CreateField::Name,
             story_type_index: 0,
+        }
+    }
+}
+
+impl EditPopupState {
+    pub fn from_story(story: &Story) -> Self {
+        let story_type_index = match story.story_type.as_str() {
+            "feature" => 0,
+            "bug" => 1,
+            "chore" => 2,
+            _ => 0,
+        };
+        
+        Self {
+            name: story.name.clone(),
+            description: story.description.clone(),
+            story_type: story.story_type.clone(),
+            selected_field: EditField::Name,
+            story_type_index,
+            story_id: story.id,
         }
     }
 }
@@ -201,6 +241,16 @@ impl App {
             create_story_requested: false,
             show_create_popup: false,
             create_popup_state: CreatePopupState::default(),
+            edit_story_requested: false,
+            show_edit_popup: false,
+            edit_popup_state: EditPopupState {
+                name: String::new(),
+                description: String::new(),
+                story_type: "feature".to_string(),
+                selected_field: EditField::Name,
+                story_type_index: 0,
+                story_id: 0,
+            },
             workflow_state_map,
             member_cache: HashMap::new(),
             current_user_id: None,
@@ -415,7 +465,77 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
-        if self.show_create_popup {
+        if self.show_edit_popup {
+            // Handle edit popup input
+            match key.code {
+                KeyCode::Esc => {
+                    self.show_edit_popup = false;
+                    self.edit_popup_state = EditPopupState {
+                        name: String::new(),
+                        description: String::new(),
+                        story_type: "feature".to_string(),
+                        selected_field: EditField::Name,
+                        story_type_index: 0,
+                        story_id: 0,
+                    };
+                }
+                KeyCode::Tab => {
+                    // Move to next field
+                    self.edit_popup_state.selected_field = match self.edit_popup_state.selected_field {
+                        EditField::Name => EditField::Description,
+                        EditField::Description => EditField::Type,
+                        EditField::Type => EditField::Name,
+                    };
+                }
+                KeyCode::Enter => {
+                    if self.edit_popup_state.selected_field == EditField::Type {
+                        // Submit the story edit
+                        if !self.edit_popup_state.name.is_empty() {
+                            self.edit_story_requested = true;
+                            self.show_edit_popup = false;
+                        }
+                    } else {
+                        // Move to next field on Enter
+                        self.edit_popup_state.selected_field = match self.edit_popup_state.selected_field {
+                            EditField::Name => EditField::Description,
+                            EditField::Description => EditField::Type,
+                            EditField::Type => EditField::Type,
+                        };
+                    }
+                }
+                KeyCode::Backspace => {
+                    match self.edit_popup_state.selected_field {
+                        EditField::Name => { self.edit_popup_state.name.pop(); }
+                        EditField::Description => { self.edit_popup_state.description.pop(); }
+                        EditField::Type => {}
+                    }
+                }
+                KeyCode::Char(c) => {
+                    match self.edit_popup_state.selected_field {
+                        EditField::Name => self.edit_popup_state.name.push(c),
+                        EditField::Description => self.edit_popup_state.description.push(c),
+                        EditField::Type => {}
+                    }
+                }
+                KeyCode::Up | KeyCode::Down if self.edit_popup_state.selected_field == EditField::Type => {
+                    // Cycle through story types
+                    let types = ["feature", "bug", "chore"];
+                    if key.code == KeyCode::Down {
+                        self.edit_popup_state.story_type_index = 
+                            (self.edit_popup_state.story_type_index + 1) % types.len();
+                    } else {
+                        self.edit_popup_state.story_type_index = 
+                            if self.edit_popup_state.story_type_index == 0 { 
+                                types.len() - 1 
+                            } else { 
+                                self.edit_popup_state.story_type_index - 1 
+                            };
+                    }
+                    self.edit_popup_state.story_type = types[self.edit_popup_state.story_type_index].to_string();
+                }
+                _ => {}
+            }
+        } else if self.show_create_popup {
             // Handle create popup input
             match key.code {
                 KeyCode::Esc => {
@@ -528,6 +648,13 @@ impl App {
                 KeyCode::Char('a') => {
                     self.show_create_popup = true;
                     self.create_popup_state = CreatePopupState::default();
+                }
+                KeyCode::Char('e') => {
+                    // Clone the story first to avoid borrowing issues
+                    if let Some(story) = self.get_selected_story().cloned() {
+                        self.show_edit_popup = true;
+                        self.edit_popup_state = EditPopupState::from_story(&story);
+                    }
                 }
                 KeyCode::Char('n') => {
                     // Load more stories (next page)
@@ -681,16 +808,16 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     } else if app.list_view_mode {
         // List view mode footer
         if app.has_more_stories() {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] column view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] column view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
         } else {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] column view | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] column view | [q] quit | {} stories loaded", app.total_loaded_stories)
         }
     } else {
         // Column view mode footer
         if app.has_more_stories() {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] list view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] list view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
         } else {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [v] list view | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] list view | [q] quit | {} stories loaded", app.total_loaded_stories)
         }
     };
     let footer = Paragraph::new(footer_text)
@@ -716,6 +843,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     // Create story popup
     if app.show_create_popup {
         draw_create_popup(frame, app);
+    }
+    
+    // Edit story popup
+    if app.show_edit_popup {
+        draw_edit_popup(frame, app);
     }
 }
 
@@ -977,6 +1109,104 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
         "[↑/↓] change type | [Tab] next field | [Enter] submit | [Esc] cancel"
     } else {
         "[Tab] next field | [Enter] next/submit | [Esc] cancel"
+    };
+    
+    let help = Paragraph::new(help_text)
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+    frame.render_widget(help, chunks[4]);
+}
+
+fn draw_edit_popup(frame: &mut Frame, app: &App) {
+    let area = centered_rect(60, 50, frame.area());
+    frame.render_widget(Clear, area);
+    
+    // Create the main popup block
+    let popup = Block::default()
+        .title(format!("Edit Story #{}", app.edit_popup_state.story_id))
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::Black).fg(Color::White));
+    frame.render_widget(popup, area);
+    
+    // Create inner area for form fields
+    let inner = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+    
+    // Layout for form fields
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Name field
+            Constraint::Length(5), // Description field
+            Constraint::Length(3), // Type field
+            Constraint::Min(1),    // Space
+            Constraint::Length(2), // Help text
+        ])
+        .split(inner);
+    
+    // Name field
+    let name_style = if app.edit_popup_state.selected_field == EditField::Name {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let name_block = Block::default()
+        .title("Name")
+        .borders(Borders::ALL)
+        .border_style(name_style);
+    let name_text = Paragraph::new(app.edit_popup_state.name.as_str())
+        .block(name_block);
+    frame.render_widget(name_text, chunks[0]);
+    
+    // Description field
+    let desc_style = if app.edit_popup_state.selected_field == EditField::Description {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let desc_block = Block::default()
+        .title("Description")
+        .borders(Borders::ALL)
+        .border_style(desc_style);
+    let desc_text = Paragraph::new(app.edit_popup_state.description.as_str())
+        .block(desc_block)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(desc_text, chunks[1]);
+    
+    // Type field
+    let type_style = if app.edit_popup_state.selected_field == EditField::Type {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    
+    let type_block = Block::default()
+        .title("Type")
+        .borders(Borders::ALL)
+        .border_style(type_style);
+    
+    let type_text = if app.edit_popup_state.selected_field == EditField::Type {
+        format!("< {} >", app.edit_popup_state.story_type)
+    } else {
+        app.edit_popup_state.story_type.clone()
+    };
+    
+    let type_widget = Paragraph::new(type_text)
+        .block(type_block)
+        .alignment(Alignment::Center);
+    frame.render_widget(type_widget, chunks[2]);
+    
+    // Help text
+    let help_text = if app.edit_popup_state.selected_field == EditField::Type {
+        "[↑/↓] change type | [Tab] next field | [Enter] save | [Esc] cancel"
+    } else {
+        "[Tab] next field | [Enter] next/save | [Esc] cancel"
     };
     
     let help = Paragraph::new(help_text)

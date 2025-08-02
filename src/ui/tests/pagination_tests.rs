@@ -18,6 +18,8 @@ mod tests {
                 owner_ids: vec![],
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-01T00:00:00Z".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
                 position: 1,
             },
@@ -32,6 +34,8 @@ mod tests {
                 owner_ids: vec![],
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-01T00:00:00Z".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
                 position: 1,
             },
@@ -43,9 +47,9 @@ mod tests {
             id: 1,
             name: "Test Workflow".to_string(),
             states: vec![
-                WorkflowState { id: 100, name: "To Do".to_string(), position: 1, color: "#cccccc".to_string() },
-                WorkflowState { id: 200, name: "In Progress".to_string(), position: 2, color: "#0000ff".to_string() },
-                WorkflowState { id: 300, name: "Done".to_string(), position: 3, color: "#00ff00".to_string() },
+                WorkflowState { id: 100, name: "To Do".to_string(), position: 1, color: "#cccccc".to_string(), state_type: "unstarted".to_string() },
+                WorkflowState { id: 200, name: "In Progress".to_string(), position: 2, color: "#0000ff".to_string(), state_type: "started".to_string() },
+                WorkflowState { id: 300, name: "Done".to_string(), position: 3, color: "#00ff00".to_string(), state_type: "done".to_string() },
             ],
         }]
     }

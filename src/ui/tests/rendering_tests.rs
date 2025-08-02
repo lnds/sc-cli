@@ -20,6 +20,8 @@ mod tests {
                 position: 1000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -32,6 +34,7 @@ mod tests {
                 name: "In Progress".to_string(),
                 color: "#f39c12".to_string(),
                 position: 1,
+                state_type: "started".to_string(),
             }],
         }];
 
@@ -161,6 +164,8 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -175,6 +180,8 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -189,12 +196,14 @@ mod tests {
                         name: "To Do".to_string(),
                         color: "#000000".to_string(),
                         position: 1,
+                        state_type: "unstarted".to_string(),
                     },
                     WorkflowState {
                         id: 20,
                         name: "In Progress".to_string(),
                         color: "#f39c12".to_string(),
                         position: 2,
+                        state_type: "started".to_string(),
                     },
                 ],
             },
@@ -242,6 +251,8 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -256,6 +267,8 @@ mod tests {
                 position: 2000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -270,6 +283,7 @@ mod tests {
                         name: "To Do".to_string(),
                         color: "#000000".to_string(),
                         position: 1,
+                        state_type: "unstarted".to_string(),
                     },
                 ],
             },
@@ -320,6 +334,8 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -334,6 +350,8 @@ mod tests {
                 position: 2000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -348,6 +366,7 @@ mod tests {
                         name: "To Do".to_string(),
                         color: "#000000".to_string(),
                         position: 1,
+                        state_type: "unstarted".to_string(),
                     },
                 ],
             },

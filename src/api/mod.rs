@@ -24,6 +24,10 @@ pub struct Story {
     pub created_at: String,
     pub updated_at: String,
     #[serde(default)]
+    pub completed_at: Option<String>,
+    #[serde(default)]
+    pub moved_at: Option<String>,
+    #[serde(default)]
     pub comments: Vec<Comment>,
 }
 
@@ -59,6 +63,8 @@ pub struct WorkflowState {
     #[serde(default)]
     pub color: String,
     pub position: i64,
+    #[serde(default, rename = "type")]
+    pub state_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -20,6 +20,8 @@ mod tests {
                 position: 1000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -34,6 +36,8 @@ mod tests {
                 position: 2000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -48,6 +52,8 @@ mod tests {
                 position: 3000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                completed_at: Some("2025-08-01T10:00:00Z".to_string()),
+                moved_at: None,
                 comments: vec![],
             },
         ]
@@ -63,18 +69,21 @@ mod tests {
                     name: "To Do".to_string(),
                     color: "#000000".to_string(),
                     position: 1,
+                    state_type: "unstarted".to_string(),
                 },
                 WorkflowState {
                     id: 20,
                     name: "In Progress".to_string(),
                     color: "#f39c12".to_string(),
                     position: 2,
+                    state_type: "started".to_string(),
                 },
                 WorkflowState {
                     id: 30,
                     name: "Done".to_string(),
                     color: "#27ae60".to_string(),
                     position: 3,
+                    state_type: "done".to_string(),
                 },
             ],
         }]
@@ -245,6 +254,8 @@ mod tests {
                 position: 3000, // Higher position
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -259,6 +270,8 @@ mod tests {
                 position: 1000, // Lower position (should come first)
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -273,6 +286,8 @@ mod tests {
                 position: 2000, // Middle position
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -285,6 +300,7 @@ mod tests {
                 name: "To Do".to_string(),
                 color: "#000000".to_string(),
                 position: 1,
+                state_type: "unstarted".to_string(),
             }],
         }];
         
@@ -408,6 +424,8 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
             Story {
@@ -422,6 +440,8 @@ mod tests {
                 position: 2000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -435,18 +455,21 @@ mod tests {
                     name: "Empty State".to_string(),
                     color: "#000000".to_string(),
                     position: 1, // First position but empty
+                    state_type: "unstarted".to_string(),
                 },
                 WorkflowState {
                     id: 20,
                     name: "Has Stories".to_string(),
                     color: "#f39c12".to_string(),
                     position: 2, // Second position with stories
+                    state_type: "started".to_string(),
                 },
                 WorkflowState {
                     id: 30,
                     name: "Another Empty".to_string(),
                     color: "#27ae60".to_string(),
                     position: 3, // Third position but empty
+                    state_type: "done".to_string(),
                 },
             ],
         }];
@@ -478,6 +501,8 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -491,12 +516,14 @@ mod tests {
                     name: "Has Stories".to_string(),
                     color: "#000000".to_string(),
                     position: 1, // First position with stories
+                    state_type: "started".to_string(),
                 },
                 WorkflowState {
                     id: 20,
                     name: "Empty State".to_string(),
                     color: "#f39c12".to_string(),
                     position: 2, // Second position but empty
+                    state_type: "unstarted".to_string(),
                 },
             ],
         }];
@@ -526,12 +553,14 @@ mod tests {
                     name: "Empty State 1".to_string(),
                     color: "#000000".to_string(),
                     position: 1,
+                    state_type: "unstarted".to_string(),
                 },
                 WorkflowState {
                     id: 20,
                     name: "Empty State 2".to_string(),
                     color: "#f39c12".to_string(),
                     position: 2,
+                    state_type: "unstarted".to_string(),
                 },
             ],
         }];
@@ -562,6 +591,8 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                completed_at: None,
+                moved_at: None,
                 comments: vec![],
             },
         ];
@@ -575,18 +606,21 @@ mod tests {
                     name: "Empty State 1".to_string(),
                     color: "#000000".to_string(),
                     position: 1,
+                    state_type: "unstarted".to_string(),
                 },
                 WorkflowState {
                     id: 20,
                     name: "Empty State 2".to_string(),
                     color: "#f39c12".to_string(),
                     position: 2,
+                    state_type: "unstarted".to_string(),
                 },
                 WorkflowState {
                     id: 30,
                     name: "Has Stories".to_string(),
                     color: "#27ae60".to_string(),
                     position: 3, // Last position with stories
+                    state_type: "started".to_string(),
                 },
             ],
         }];

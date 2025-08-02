@@ -1,4 +1,5 @@
 use crate::api::{Story, Workflow};
+use chrono::{DateTime, Datelike, Duration, Utc, Weekday};
 use crossterm::event::{self, KeyCode};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -11,6 +12,47 @@ use std::collections::HashMap;
 
 #[cfg(test)]
 mod tests;
+
+/// Helper function to determine if a date string is from the current week
+fn is_current_week(date_str: &str) -> bool {
+    if let Ok(date) = DateTime::parse_from_rfc3339(date_str) {
+        let now = Utc::now();
+        let date_utc = date.with_timezone(&Utc);
+        
+        // Get the start of the current week (Monday)
+        let days_since_monday = match now.weekday() {
+            Weekday::Mon => 0,
+            Weekday::Tue => 1,
+            Weekday::Wed => 2,
+            Weekday::Thu => 3,
+            Weekday::Fri => 4,
+            Weekday::Sat => 5,
+            Weekday::Sun => 6,
+        };
+        
+        let week_start = now - Duration::days(days_since_monday);
+        let week_start = week_start.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+        
+        // Get the end of the current week (Sunday)
+        let week_end = week_start + Duration::days(7);
+        
+        date_utc >= week_start && date_utc < week_end
+    } else {
+        false
+    }
+}
+
+/// Helper function to check if a workflow state is a "done" state
+fn is_done_state(state_id: i64, workflows: &[Workflow]) -> bool {
+    for workflow in workflows {
+        for state in &workflow.states {
+            if state.id == state_id {
+                return state.state_type == "done";
+            }
+        }
+    }
+    false
+}
 
 pub struct App {
     pub show_detail: bool,
@@ -29,6 +71,7 @@ pub struct App {
     pub selected_row: usize,
     pub stories_by_state: HashMap<i64, Vec<Story>>,
     pub workflow_states: Vec<(i64, String)>,
+    pub workflows: Vec<Workflow>, // Store workflows for filtering
     // Pagination state
     pub search_query: String, // Store the current search query
     pub next_page_token: Option<String>, // Token for the next page
@@ -67,9 +110,27 @@ impl Default for CreatePopupState {
 
 impl App {
     pub fn new(stories: Vec<Story>, workflows: Vec<Workflow>, search_query: String, next_page_token: Option<String>) -> Self {
+        // Filter stories before grouping by state
+        let filtered_stories = stories.into_iter().filter(|story| {
+            if is_done_state(story.workflow_state_id, &workflows) {
+                // For Done states, only keep stories completed in the current week
+                if let Some(completed_at) = &story.completed_at {
+                    return is_current_week(completed_at);
+                } else if let Some(moved_at) = &story.moved_at {
+                    // Fall back to moved_at if completed_at is not available
+                    return is_current_week(moved_at);
+                } else {
+                    // If no completion date available, use updated_at as fallback
+                    return is_current_week(&story.updated_at);
+                }
+            }
+            // Keep all non-Done stories
+            true
+        }).collect::<Vec<_>>();
+        
         // Group stories by workflow state
         let mut stories_by_state: HashMap<i64, Vec<Story>> = HashMap::new();
-        for story in stories.iter() {
+        for story in filtered_stories.iter() {
             stories_by_state
                 .entry(story.workflow_state_id)
                 .or_default()
@@ -79,6 +140,13 @@ impl App {
         // Sort stories within each state by position
         for stories in stories_by_state.values_mut() {
             stories.sort_by_key(|s| s.position);
+        }
+        
+        // Limit Done states to 10 stories maximum
+        for (&state_id, stories) in stories_by_state.iter_mut() {
+            if is_done_state(state_id, &workflows) && stories.len() > 10 {
+                stories.truncate(10);
+            }
         }
         
         // Create workflow state map for quick lookups
@@ -114,7 +182,7 @@ impl App {
             }
         }
 
-        let total_stories = stories.len();
+        let total_stories = filtered_stories.len();
         
         Self {
             show_detail: false,
@@ -133,6 +201,7 @@ impl App {
             selected_row: 0,
             stories_by_state,
             workflow_states,
+            workflows,
             search_query,
             next_page_token,
             load_more_requested: false,
@@ -416,8 +485,26 @@ impl App {
     pub fn merge_stories(&mut self, new_stories: Vec<Story>, next_page_token: Option<String>) {
         let mut actually_added = 0;
         
-        // Add new stories to existing state buckets, avoiding duplicates
-        for story in new_stories.iter() {
+        // Filter new stories using the same logic as App::new
+        let filtered_stories: Vec<&Story> = new_stories.iter().filter(|story| {
+            if is_done_state(story.workflow_state_id, &self.workflows) {
+                // For Done states, only keep stories completed in the current week
+                if let Some(completed_at) = &story.completed_at {
+                    return is_current_week(completed_at);
+                } else if let Some(moved_at) = &story.moved_at {
+                    // Fall back to moved_at if completed_at is not available
+                    return is_current_week(moved_at);
+                } else {
+                    // If no completion date available, use updated_at as fallback
+                    return is_current_week(&story.updated_at);
+                }
+            }
+            // Keep all non-Done stories
+            true
+        }).collect();
+        
+        // Add filtered stories to existing state buckets, avoiding duplicates
+        for story in filtered_stories {
             let state_stories = self.stories_by_state
                 .entry(story.workflow_state_id)
                 .or_default();
@@ -432,6 +519,13 @@ impl App {
         // Sort stories within each state by position
         for stories in self.stories_by_state.values_mut() {
             stories.sort_by_key(|s| s.position);
+        }
+        
+        // Apply limit of 10 stories for Done states
+        for (&state_id, stories) in self.stories_by_state.iter_mut() {
+            if is_done_state(state_id, &self.workflows) && stories.len() > 10 {
+                stories.truncate(10);
+            }
         }
         
         // Update pagination state

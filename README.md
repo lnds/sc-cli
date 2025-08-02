@@ -128,44 +128,82 @@ When you press **o** on a selected story:
 
 ### Examples
 
+#### Viewing Stories
+
 ```bash
 # Basic usage with command line args
-cargo run -- john.doe --token YOUR_API_TOKEN
+cargo run -- view john.doe --token YOUR_API_TOKEN
 
 # Using workspace from config
-cargo run -- --workspace personal
-cargo run -- -w work
+cargo run -- view --workspace personal
+cargo run -- view -w work
 
 # With options
-cargo run -- john.doe --token YOUR_API_TOKEN --limit 20 --story-type feature
+cargo run -- view john.doe --token YOUR_API_TOKEN --limit 20 --story-type feature
 
 # Show stories where you are the requester
-cargo run -- --workspace work --requester
+cargo run -- view --workspace work --requester
 
 # Show all stories (no user filter)
-cargo run -- --workspace work --all
+cargo run -- view --workspace work --all
 
 # Custom search (overrides default filters)
-cargo run -- --workspace work --search "state:done updated:\"last week\""
+cargo run -- view --workspace work --search "state:done updated:\"last week\""
 
 # Enable debug output for troubleshooting
-cargo run -- -w personal --debug
+cargo run -- view -w personal --debug
+
+# Default behavior (view command is optional)
+cargo run -- --workspace personal
+```
+
+#### Adding Stories
+
+```bash
+# Interactive mode - prompts for all values
+cargo run -- add --workspace work
+
+# Provide story name on command line (with quotes)
+cargo run -- add "Fix login bug" --workspace work
+
+# Provide story name without quotes (multiple words)
+cargo run -- add --type bug this is a bug fix --workspace work
+
+# Provide both name and type
+cargo run -- add --type bug Fix login bug --workspace work
+
+# Using direct token instead of workspace
+cargo run -- add --token YOUR_API_TOKEN
+
+# All values provided - only prompts for description
+cargo run -- add "Add user profile feature" --type feature -w work
 ```
 
 ### Command-line Options
 
-- `username` - The Shortcut mention name to search for (required if not using --workspace)
-- `--token` - Your Shortcut API token (required if not using --workspace)
-- `--workspace` / `-w` - Workspace name from config file (alternative to username/token)
+#### Global Options
+- `--workspace` / `-w` - Workspace name from config file
+- `--debug` / `-d` - Enable debug output
+
+#### View Command (default)
+- `username` - The Shortcut mention name to search for (optional if using --workspace)
+- `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
 - `--limit` (optional) - Maximum number of stories to display (default: 25)
 - `--story-type` (optional) - Filter by story type: feature, bug, chore
 - `--search` (optional) - Custom search query using Shortcut's search syntax
 - `--all` (optional) - Show all stories (no owner/requester filter)
 - `--owner` (optional) - Show stories where user is the owner (default behavior)
 - `--requester` (optional) - Show stories where user is the requester
-- `--debug` (optional) - Enable debug output for troubleshooting
 
 Note: The `--all`, `--owner`, and `--requester` flags are mutually exclusive. Only one can be used at a time.
+
+#### Add Command
+- `name` (optional) - Story name as positional arguments. Can be provided as:
+  - A quoted string: `"Fix login bug"`
+  - Multiple words: `Fix login bug` (all remaining arguments become the name)
+  - Will prompt if not provided
+- `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
+- `--type` (optional) - Story type: feature, bug, or chore (will prompt if not provided)
 
 ### Search Syntax
 

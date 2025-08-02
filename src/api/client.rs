@@ -281,4 +281,48 @@ impl ShortcutApi for ShortcutClient {
 
         Ok(members)
     }
+
+    fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64) -> Result<Story> {
+        let url = format!("{}/stories", self.base_url);
+        
+        let create_payload = serde_json::json!({
+            "name": name,
+            "description": description,
+            "story_type": story_type,
+            "requested_by_id": requested_by_id,
+            "workflow_state_id": workflow_state_id
+        });
+
+        if self.debug {
+            eprintln!("Creating story with payload: {}", serde_json::to_string_pretty(&create_payload)?);
+        }
+        
+        let response = self
+            .client
+            .post(&url)
+            .headers(self.headers())
+            .json(&create_payload)
+            .send()
+            .context("Failed to send story creation request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Create story response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to create story: {}. Error: {}", status, error_text);
+        }
+
+        let created_story: Story = response
+            .json()
+            .context("Failed to parse created story response")?;
+
+        if self.debug {
+            eprintln!("Successfully created story #{} - {}", created_story.id, created_story.name);
+        }
+
+        Ok(created_story)
+    }
 }

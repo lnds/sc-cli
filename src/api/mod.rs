@@ -92,4 +92,5 @@ pub trait ShortcutApi {
     fn get_current_member(&self) -> Result<CurrentMember>;
     fn update_story(&self, story_id: i64, owner_ids: Vec<String>) -> Result<Story>;
     fn get_members(&self) -> Result<Vec<Member>>;
+    fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64) -> Result<Story>;
 }

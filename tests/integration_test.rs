@@ -12,9 +12,10 @@ fn test_help_command() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("TUI client for Shortcut stories"));
-    assert!(stdout.contains("--token"));
-    assert!(stdout.contains("--limit"));
+    assert!(stdout.contains("--workspace"));
     assert!(stdout.contains("--debug"));
+    assert!(stdout.contains("add"));
+    assert!(stdout.contains("view"));
 }
 
 #[test]
@@ -32,13 +33,13 @@ fn test_version_command() {
 #[test]
 fn test_missing_required_args() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "testuser"])
+        .args(&["run", "--", "view", "testuser"])
         .output()
         .expect("Failed to execute command");
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("required") || stderr.contains("--token"));
+    assert!(stderr.contains("--token") || stderr.contains("--workspace"));
 }
 
 #[cfg(test)]

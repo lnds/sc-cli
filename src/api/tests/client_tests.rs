@@ -166,6 +166,79 @@ mod tests {
     }
     
     #[test]
+    fn test_create_story_success() {
+        let mut server = mockito::Server::new();
+        let url = server.url();
+        
+        let mock_response = json!({
+            "id": 999,
+            "name": "Test Story Creation",
+            "description": "This is a test description",
+            "workflow_state_id": 500,
+            "app_url": "https://app.shortcut.com/org/story/999",
+            "story_type": "feature",
+            "labels": [],
+            "owner_ids": [],
+            "position": 1000,
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        });
+
+        let _m = server.mock("POST", "/stories")
+            .match_header("Shortcut-Token", "test-token")
+            .match_body(mockito::Matcher::Json(json!({
+                "name": "Test Story Creation",
+                "description": "This is a test description",
+                "story_type": "feature",
+                "requested_by_id": "user-123",
+                "workflow_state_id": 500
+            })))
+            .with_status(201)
+            .with_header("content-type", "application/json")
+            .with_body(mock_response.to_string())
+            .create();
+
+        let client = create_test_client(&url);
+        let story = client.create_story(
+            "Test Story Creation".to_string(),
+            "This is a test description".to_string(),
+            "feature".to_string(),
+            "user-123".to_string(),
+            500
+        ).unwrap();
+
+        assert_eq!(story.id, 999);
+        assert_eq!(story.name, "Test Story Creation");
+        assert_eq!(story.description, "This is a test description");
+        assert_eq!(story.story_type, "feature");
+    }
+
+    #[test]
+    fn test_create_story_api_error() {
+        let mut server = mockito::Server::new();
+        let url = server.url();
+        
+        let _m = server.mock("POST", "/stories")
+            .match_header("Shortcut-Token", "test-token")
+            .with_status(400)
+            .with_body(json!({"error": "Invalid story type"}).to_string())
+            .create();
+
+        let client = create_test_client(&url);
+        let result = client.create_story(
+            "Test Story".to_string(),
+            "Description".to_string(),
+            "invalid-type".to_string(),
+            "user-123".to_string(),
+            500
+        );
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("Failed to create story"));
+    }
+
+    #[test]
     fn test_search_stories_with_limit() {
         let mut server = mockito::Server::new();
         let url = server.url();

@@ -116,6 +116,7 @@ pub trait ShortcutApi {
     fn search_stories(&self, query: &str, limit: Option<usize>) -> Result<Vec<Story>>;
     fn search_stories_page(&self, query: &str, next_token: Option<String>) -> Result<SearchStoriesResult>;
     fn get_workflows(&self) -> Result<Vec<Workflow>>;
+    fn get_story(&self, story_id: i64) -> Result<Story>;
     fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story>;
     fn get_current_member(&self) -> Result<CurrentMember>;
     fn update_story(&self, story_id: i64, owner_ids: Vec<String>) -> Result<Story>;

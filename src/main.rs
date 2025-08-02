@@ -1,6 +1,7 @@
 mod api;
 mod config;
 mod story_creator;
+mod story_editor;
 mod ui;
 
 use anyhow::{Context, Result};
@@ -15,6 +16,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, collections::HashMap};
 use story_creator::StoryCreator;
+use story_editor::StoryEditor;
 use ui::App;
 
 fn validate_story_type(s: &str) -> Result<String, String> {
@@ -158,6 +160,15 @@ enum Command {
         #[arg(long, conflicts_with_all = ["all", "owner"])]
         requester: bool,
     },
+    /// Edit an existing story
+    Edit {
+        /// Story ID to edit (e.g., 42 or sc-42)
+        story_id: String,
+
+        /// Shortcut API token (optional if using workspace)
+        #[arg(short, long)]
+        token: Option<String>,
+    },
 }
 
 fn main() -> Result<()> {
@@ -197,6 +208,9 @@ fn main() -> Result<()> {
                 requester,
                 debug: args.debug,
             })
+        }
+        Some(Command::Edit { story_id, token }) => {
+            handle_edit_command(args.workspace, token, story_id, args.debug)
         }
         None => {
             // Default to view command when no subcommand is specified
@@ -388,6 +402,110 @@ fn handle_finish_command(workspace: Option<String>, token: Option<String>, story
             anyhow::bail!("Failed to finish story");
         }
     }
+
+    Ok(())
+}
+
+fn handle_edit_command(workspace: Option<String>, token: Option<String>, story_id: String, debug: bool) -> Result<()> {
+    // Parse story ID - accept both "42" and "sc-42" formats
+    let story_id = if story_id.to_lowercase().starts_with("sc-") {
+        story_id[3..].parse::<i64>()
+            .context("Invalid story ID format. Expected 'sc-N' where N is a number")?
+    } else {
+        story_id.parse::<i64>()
+            .context("Invalid story ID format. Expected a number or 'sc-N' format")?
+    };
+    // Get token from args or config
+    // Priority: 1. Explicit workspace, 2. Default workspace (if no token), 3. Token from CLI
+    let token = if let Some(workspace_name) = workspace {
+        // Use explicitly specified workspace
+        let (config, _created) = Config::load_or_create(&workspace_name)
+            .context("Failed to load or create config")?;
+        let workspace = config.get_workspace(&workspace_name)
+            .context(format!("Failed to get workspace '{workspace_name}'"))?;
+        workspace.api_key.clone()
+    } else if token.is_none() {
+        // No args provided, try to use default workspace
+        match Config::load() {
+            Ok(config) => {
+                if let Some(default_workspace_name) = config.get_default_workspace() {
+                    let workspace = config.get_workspace(&default_workspace_name)
+                        .context(format!("Failed to get default workspace '{default_workspace_name}'"))?;
+                    workspace.api_key.clone()
+                } else {
+                    anyhow::bail!("No default workspace configured. Use --workspace to specify one or provide --token");
+                }
+            }
+            Err(_) => {
+                anyhow::bail!("No configuration file found. Use --workspace to create one or provide --token");
+            }
+        }
+    } else {
+        // Use command line arguments
+        token.ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?
+    };
+
+    // Initialize API client
+    let client = ShortcutClient::new(token, debug)
+        .context("Failed to create Shortcut client")?;
+
+    if debug {
+        eprintln!("Fetching story #{story_id} for editing...");
+    }
+
+    // Fetch the story to edit
+    let story = client.get_story(story_id)
+        .context(format!("Failed to fetch story #{story_id}"))?;
+
+    if debug {
+        eprintln!("Found story: {} - {}", story.id, story.name);
+        eprintln!("Current type: {}", story.story_type);
+        eprintln!("Description length: {} chars", story.description.len());
+    }
+
+    // Create a story editor with the current story
+    let mut story_editor = StoryEditor::from_story(&story);
+
+    // Show current story details
+    println!("\n📖 Current Story Details:");
+    println!("  ID: #{}", story.id);
+    println!("  Name: {}", story.name);
+    println!("  Type: {}", story.story_type);
+    if story.description.is_empty() {
+        println!("  Description: (no description)");
+    } else {
+        println!("  Description:");
+        for line in story.description.lines() {
+            println!("    {}", line);
+        }
+    }
+    println!("  URL: {}", story.app_url);
+
+    // Interactive editing
+    let should_save = story_editor.edit_with_prompts()
+        .context("Failed to edit story")?;
+
+    if !should_save {
+        println!("\n❌ Edit cancelled. No changes were made.");
+        return Ok(());
+    }
+
+    if debug {
+        eprintln!("Updating story:");
+        eprintln!("  Name: {}", story_editor.name);
+        eprintln!("  Type: {}", story_editor.story_type);
+        eprintln!("  Description length: {} chars", story_editor.description.len());
+    }
+
+    // Update the story
+    let updated_story = story_editor.update(&client)
+        .context("Failed to update story")?;
+
+    println!("\n✅ Story updated successfully!");
+    println!("  ID: #{}", updated_story.id);
+    println!("  Name: {}", updated_story.name);
+    println!("  Type: {}", updated_story.story_type);
+    println!("  URL: {}", updated_story.app_url);
 
     Ok(())
 }

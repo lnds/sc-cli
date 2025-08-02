@@ -213,9 +213,9 @@ impl Config {
             return Ok(local_config);
         }
         
-        // Then check home directory ~/.config/sc-tui/config.toml
+        // Then check home directory ~/.config/sc-cli/config.toml
         if let Some(home_dir) = dirs::home_dir() {
-            let config_dir = home_dir.join(".config").join("sc-tui");
+            let config_dir = home_dir.join(".config").join("sc-cli");
             let home_config = config_dir.join("config.toml");
             if home_config.exists() {
                 return Ok(home_config);
@@ -227,9 +227,9 @@ impl Config {
     }
     
     fn default_config_path() -> Result<PathBuf> {
-        // Default to home directory ~/.config/sc-tui/config.toml
+        // Default to home directory ~/.config/sc-cli/config.toml
         if let Some(home_dir) = dirs::home_dir() {
-            let config_dir = home_dir.join(".config").join("sc-tui");
+            let config_dir = home_dir.join(".config").join("sc-cli");
             Ok(config_dir.join("config.toml"))
         } else {
             // Fallback to current directory

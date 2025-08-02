@@ -1,6 +1,6 @@
-# Shortcut Story TUI
+# Shortcut CLI & TUI
 
-An interactive terminal UI for fetching and displaying stories from Shortcut (formerly Clubhouse) via their API.
+A command-line interface and interactive terminal UI for managing Shortcut stories via their API.
 
 ## Prerequisites
 
@@ -8,6 +8,8 @@ An interactive terminal UI for fetching and displaying stories from Shortcut (fo
 2. **Shortcut API Token** - Get yours from: <https://app.shortcut.com/settings/account/api-tokens>
 
 ## Installation
+
+### From Source
 
 ```bash
 # Clone the repository
@@ -17,8 +19,22 @@ cd sc-cli
 # Build the project
 cargo build --release
 
-# The binary will be available at ./target/release/sc-tui
+# The binary will be available at ./target/release/sc-cli
 ```
+
+### Using Cargo Install
+
+```bash
+# Install directly from the repository (requires Git)
+cargo install --git <repository-url>
+
+# Or install from a local clone
+git clone <repository-url>
+cd sc-cli
+cargo install --path .
+```
+
+This will install the `sc-cli` binary to your Cargo bin directory (usually `~/.cargo/bin`), making it available from anywhere on your system.
 
 ## Usage
 
@@ -26,10 +42,7 @@ cargo build --release
 
 ```bash
 # Run the TUI
-cargo run -- <username> --token <your-api-token>
-
-# Or use the compiled binary
-./target/release/sc-tui <username> --token <your-api-token>
+sc-cli <username> --token <your-api-token>
 ```
 
 ### Using Configuration File (Recommended)
@@ -42,7 +55,7 @@ If you have only one workspace configured, it will be used automatically:
 
 ```bash
 # With single workspace, no need to specify --workspace
-cargo run
+sc-cli
 ```
 
 For multiple workspaces, you can set a default in the config file:
@@ -55,7 +68,7 @@ Then run without arguments:
 
 ```bash
 # Uses the default workspace
-cargo run
+sc-cli
 ```
 
 #### Interactive Setup (Easy Way)
@@ -64,15 +77,15 @@ Simply run with a workspace name and the tool will guide you through setup:
 
 ```bash
 # First time setup - will prompt to create config
-cargo run -- --workspace personal
+sc-cli --workspace personal
 
 # Short form
-cargo run -- -w work
+sc-cli -w work
 ```
 
 The tool will:
 1. Ask if you want to create the configuration
-2. Let you choose where to save it (default: `~/.config/sc-tui/config.toml`)
+2. Let you choose where to save it (default: `~/.config/sc-cli/config.toml`)
 3. Prompt for your Shortcut API key
 4. Prompt for your Shortcut mention name
 5. Set this as the default workspace if it's the first one
@@ -147,51 +160,51 @@ When you press **a** in the TUI:
 
 ```bash
 # Basic usage with command line args
-cargo run -- view john.doe --token YOUR_API_TOKEN
+sc-cli view john.doe --token YOUR_API_TOKEN
 
 # Using workspace from config
-cargo run -- view --workspace personal
-cargo run -- view -w work
+sc-cli view --workspace personal
+sc-cli view -w work
 
 # With options
-cargo run -- view john.doe --token YOUR_API_TOKEN --limit 20 --story-type feature
+sc-cli view john.doe --token YOUR_API_TOKEN --limit 20 --story-type feature
 
 # Show stories where you are the requester
-cargo run -- view --workspace work --requester
+sc-cli view --workspace work --requester
 
 # Show all stories (no user filter)
-cargo run -- view --workspace work --all
+sc-cli view --workspace work --all
 
 # Custom search (overrides default filters)
-cargo run -- view --workspace work --search "state:done updated:\"last week\""
+sc-cli view --workspace work --search "state:done updated:\"last week\""
 
 # Enable debug output for troubleshooting
-cargo run -- view -w personal --debug
+sc-cli view -w personal --debug
 
 # Default behavior (view command is optional)
-cargo run -- --workspace personal
+sc-cli --workspace personal
 ```
 
 #### Adding Stories
 
 ```bash
 # Interactive mode - prompts for all values
-cargo run -- add --workspace work
+sc-cli add --workspace work
 
 # Provide story name on command line (with quotes)
-cargo run -- add "Fix login bug" --workspace work
+sc-cli add "Fix login bug" --workspace work
 
 # Provide story name without quotes (multiple words)
-cargo run -- add --type bug this is a bug fix --workspace work
+sc-cli add --type bug this is a bug fix --workspace work
 
 # Provide both name and type
-cargo run -- add --type bug Fix login bug --workspace work
+sc-cli add --type bug Fix login bug --workspace work
 
 # Using direct token instead of workspace
-cargo run -- add --token YOUR_API_TOKEN
+sc-cli add --token YOUR_API_TOKEN
 
 # All values provided - only prompts for description
-cargo run -- add "Add user profile feature" --type feature -w work
+sc-cli add "Add user profile feature" --type feature -w work
 ```
 
 ### Command-line Options
@@ -297,8 +310,11 @@ cargo build
 # Release build (optimized)
 cargo build --release
 
-# Run with cargo
+# Run with cargo (for development)
 cargo run -- <username> --token <token>
+
+# Or run the installed binary
+sc-cli <username> --token <token>
 
 # Run tests
 cargo test

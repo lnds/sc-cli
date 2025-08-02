@@ -11,7 +11,7 @@ fn test_help_command() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("TUI client for Shortcut stories"));
+    assert!(stdout.contains("CLI and TUI client for Shortcut stories"));
     assert!(stdout.contains("--workspace"));
     assert!(stdout.contains("--debug"));
     assert!(stdout.contains("add"));
@@ -27,7 +27,7 @@ fn test_version_command() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("sc-tui"));
+    assert!(stdout.contains("sc-cli"));
 }
 
 #[test]

@@ -1,17 +1,17 @@
 [package]
-name = "sc-tui"
+name = "sc-cli"
 version = "0.1.0"
 edition = "2024"
 authors = ["Eduardo Diaz"]
-description = "TUI client for Shortcut stories"
+description = "CLI and TUI client for Shortcut stories"
 license = "MIT"
 
 [[bin]]
-name = "sc-tui"
+name = "sc-cli"
 path = "src/main.rs"
 
 [lib]
-name = "sc_tui"
+name = "sc_cli"
 path = "src/lib.rs"
 
 [dependencies]

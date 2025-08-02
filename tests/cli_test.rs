@@ -3,7 +3,7 @@ use predicates::prelude::*;
 
 #[test]
 fn test_cli_without_args() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     // The test expects specific error messages but in test environment we get terminal device errors
     // We'll accept either the expected messages or various terminal-related errors
     cmd.assert()
@@ -19,7 +19,7 @@ fn test_cli_without_args() {
 
 #[test]
 fn test_cli_help() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("--help")
         .assert()
         .success()
@@ -32,16 +32,16 @@ fn test_cli_help() {
 
 #[test]
 fn test_cli_version() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("sc-tui"));
+        .stdout(predicate::str::contains("sc-cli"));
 }
 
 #[test]
 fn test_cli_missing_token() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("view")
         .arg("testuser")
         .assert()
@@ -53,7 +53,7 @@ fn test_cli_missing_token() {
 fn test_cli_debug_flag() {
     // This test verifies the debug flag is accepted
     // We can't test the full TUI interaction easily in integration tests
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("view")
         .arg("--help")
         .assert()
@@ -63,7 +63,7 @@ fn test_cli_debug_flag() {
 
 #[test]
 fn test_cli_limit_validation() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("view")
         .arg("testuser")
         .arg("--token")
@@ -77,7 +77,7 @@ fn test_cli_limit_validation() {
 
 #[test]
 fn test_cli_add_help() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("add")
         .arg("--help")
         .assert()
@@ -90,7 +90,7 @@ fn test_cli_add_requires_auth() {
     // Test that add command fails when no workspace or token is provided
     // In test environment, it will fail with "not a terminal" error
     // because it tries to use interactive prompts
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("add")
         .assert()
         .failure()
@@ -104,7 +104,7 @@ fn test_cli_add_requires_auth() {
 
 #[test]
 fn test_cli_add_with_story_name() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("add")
         .arg("--help")
         .assert()
@@ -116,7 +116,7 @@ fn test_cli_add_with_story_name() {
 fn test_cli_add_with_multiple_words() {
     // Test that we can provide multiple words for story name
     // Using --help to avoid actual story creation
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("add")
         .arg("--help")
         .assert()
@@ -126,7 +126,7 @@ fn test_cli_add_with_multiple_words() {
 
 #[test]
 fn test_cli_add_type_validation() {
-    let mut cmd = Command::cargo_bin("sc-tui").unwrap();
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     cmd.arg("add")
         .arg("--type")
         .arg("invalid-type")

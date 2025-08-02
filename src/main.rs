@@ -39,7 +39,7 @@ struct ViewCommandArgs {
 }
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "TUI client for Shortcut stories", long_about = None)]
+#[command(author, version, about = "CLI and TUI client for Shortcut stories", long_about = None)]
 struct Args {
     /// Workspace name from config file (optional if default workspace is set)
     #[arg(short, long, global = true)]

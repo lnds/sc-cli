@@ -98,8 +98,8 @@ user_id = "your.work.mention.name"
 
 ### TUI Navigation
 
-- **↑/k** - Move up in the story list
-- **↓/j** - Move down in the story list
+- **↑/k** - Move up in the story list (or scroll up in detail view)
+- **↓/j** - Move down in the story list (or scroll down in detail view)
 - **←/h** - Move to previous column (workflow state)
 - **→/l** - Move to next column (workflow state)
 - **Enter** - View story details
@@ -248,7 +248,10 @@ The TUI shows:
   - Workflow State
   - Owners (shows owner names or "Unassigned")
   - Description
+  - Comments (with author names and timestamps)
   - Shortcut URL
+  - Scrollable content when there are many comments or long descriptions
+  - Scroll indicator showing current position
 - State selector dialog for moving stories between workflow states
 
 ### Error Handling

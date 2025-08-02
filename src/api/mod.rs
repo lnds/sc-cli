@@ -23,6 +23,18 @@ pub struct Story {
     pub position: i64,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub comments: Vec<Comment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    pub id: i64,
+    pub text: String,
+    pub author_id: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

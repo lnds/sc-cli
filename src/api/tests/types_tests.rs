@@ -21,7 +21,16 @@ mod tests {
             "owner_ids": ["user-123"],
             "position": 1000,
             "created_at": "2024-01-01T00:00:00Z",
-            "updated_at": "2024-01-02T00:00:00Z"
+            "updated_at": "2024-01-02T00:00:00Z",
+            "comments": [
+                {
+                    "id": 1,
+                    "text": "This is a test comment",
+                    "author_id": "user-456",
+                    "created_at": "2024-01-03T10:00:00Z",
+                    "updated_at": "2024-01-03T10:00:00Z"
+                }
+            ]
         });
 
         let story: Story = serde_json::from_value(json_data).unwrap();
@@ -35,6 +44,9 @@ mod tests {
         assert_eq!(story.labels.len(), 1);
         assert_eq!(story.labels[0].name, "backend");
         assert_eq!(story.owner_ids, vec!["user-123"]);
+        assert_eq!(story.comments.len(), 1);
+        assert_eq!(story.comments[0].text, "This is a test comment");
+        assert_eq!(story.comments[0].author_id, "user-456");
     }
 
     #[test]

@@ -20,6 +20,7 @@ mod tests {
                 position: 1000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                comments: vec![],
             },
             Story {
                 id: 2,
@@ -33,6 +34,7 @@ mod tests {
                 position: 2000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                comments: vec![],
             },
             Story {
                 id: 3,
@@ -46,6 +48,7 @@ mod tests {
                 position: 3000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                comments: vec![],
             },
         ]
     }
@@ -242,6 +245,7 @@ mod tests {
                 position: 3000, // Higher position
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
             Story {
                 id: 1,
@@ -255,6 +259,7 @@ mod tests {
                 position: 1000, // Lower position (should come first)
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
             Story {
                 id: 2,
@@ -268,6 +273,7 @@ mod tests {
                 position: 2000, // Middle position
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
         ];
         
@@ -342,6 +348,48 @@ mod tests {
         }).unwrap();
         
         assert!(!app.show_create_popup);
+    }
+
+    #[test]
+    fn test_detail_scroll_functionality() {
+        let stories = create_test_stories();
+        let workflows = create_test_workflows();
+        let mut app = App::new(stories, workflows);
+        
+        // Initially scroll offset should be 0
+        assert_eq!(app.detail_scroll_offset, 0);
+        
+        // Show detail view
+        app.toggle_detail();
+        assert!(app.show_detail);
+        assert_eq!(app.detail_scroll_offset, 0); // Should reset on open
+        
+        // Test scrolling down
+        app.detail_scroll_offset += 1;
+        assert_eq!(app.detail_scroll_offset, 1);
+        
+        app.detail_scroll_offset += 1;
+        assert_eq!(app.detail_scroll_offset, 2);
+        
+        // Test scrolling up
+        app.scroll_detail_up();
+        assert_eq!(app.detail_scroll_offset, 1);
+        
+        app.scroll_detail_up();
+        assert_eq!(app.detail_scroll_offset, 0);
+        
+        // Test that scrolling up at 0 doesn't go negative
+        app.scroll_detail_up();
+        assert_eq!(app.detail_scroll_offset, 0);
+        
+        // Test that closing detail view resets scroll
+        app.detail_scroll_offset = 5;
+        app.toggle_detail(); // Close
+        assert!(!app.show_detail);
+        // Scroll offset should still be 5 until we open again
+        app.toggle_detail(); // Open
+        assert!(app.show_detail);
+        assert_eq!(app.detail_scroll_offset, 0); // Reset on open
     }
 
     // Note: Event handling tests would require mocking crossterm events

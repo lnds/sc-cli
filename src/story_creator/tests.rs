@@ -73,6 +73,7 @@ mod tests {
             position: 1000,
             created_at: "2024-01-01T00:00:00Z".to_string(),
             updated_at: "2024-01-01T00:00:00Z".to_string(),
+            comments: vec![],
         };
 
         let mock_api = MockApi {
@@ -110,6 +111,7 @@ mod tests {
             position: 0,
             created_at: String::new(),
             updated_at: String::new(),
+            comments: vec![],
         };
 
         let mock_api = MockApi {

@@ -23,6 +23,7 @@ pub struct App {
     pub workflow_state_map: HashMap<i64, String>,
     pub member_cache: HashMap<String, String>, // owner_id -> name
     pub current_user_id: Option<String>, // ID of current user
+    pub detail_scroll_offset: usize, // Scroll offset for detail popup
     pub should_quit: bool,
     pub selected_column: usize,
     pub selected_row: usize,
@@ -107,6 +108,7 @@ impl App {
             workflow_state_map,
             member_cache: HashMap::new(),
             current_user_id: None,
+            detail_scroll_offset: 0,
             should_quit: false,
             selected_column: 0,
             selected_row: 0,
@@ -169,6 +171,10 @@ impl App {
             if let Some(stories) = self.stories_by_state.get(&state_id) {
                 if !stories.is_empty() {
                     self.show_detail = !self.show_detail;
+                    // Reset scroll offset when opening detail view
+                    if self.show_detail {
+                        self.detail_scroll_offset = 0;
+                    }
                 }
             }
         }
@@ -314,6 +320,19 @@ impl App {
             // Normal navigation
             match key.code {
                 KeyCode::Char('q') => self.should_quit = true,
+                // Handle detail view scrolling first (more specific patterns)
+                KeyCode::Char('j') | KeyCode::Down if self.show_detail => {
+                    // Simple scroll down - max scroll will be calculated in draw function
+                    self.detail_scroll_offset += 1;
+                }
+                KeyCode::Char('k') | KeyCode::Up if self.show_detail => {
+                    self.scroll_detail_up();
+                }
+                KeyCode::Esc if self.show_detail => {
+                    self.show_detail = false;
+                    self.detail_scroll_offset = 0;
+                }
+                // Regular navigation (less specific patterns)
                 KeyCode::Char('j') | KeyCode::Down => self.next(),
                 KeyCode::Char('k') | KeyCode::Up => self.previous(),
                 KeyCode::Char('l') | KeyCode::Right => self.next_column(),
@@ -329,7 +348,6 @@ impl App {
                     self.show_create_popup = true;
                     self.create_popup_state = CreatePopupState::default();
                 }
-                KeyCode::Esc if self.show_detail => self.show_detail = false,
                 _ => {}
             }
         }
@@ -359,6 +377,12 @@ impl App {
 
     pub fn set_current_user_id(&mut self, user_id: String) {
         self.current_user_id = Some(user_id);
+    }
+
+    pub fn scroll_detail_up(&mut self) {
+        if self.detail_scroll_offset > 0 {
+            self.detail_scroll_offset -= 1;
+        }
     }
 }
 
@@ -549,7 +573,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
     let footer_text = if app.show_state_selector {
         "[↑/k] [↓/j] select state | [Enter] confirm | [Esc] cancel"
     } else if app.show_detail {
-        "Press [Esc] to close detail | [q] to quit"
+        "[↑/k] [↓/j] scroll | [Esc] close detail | [q] quit"
     } else {
         "[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [a] add | [q] quit"
     };
@@ -645,10 +669,64 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
         Span::styled(&story.app_url, Style::default().fg(Color::Cyan)),
     ]));
 
-    let paragraph = Paragraph::new(text_lines)
+    // Add comments section
+    if !story.comments.is_empty() {
+        text_lines.push(Line::from(""));
+        text_lines.push(Line::from(vec![
+            Span::styled("Comments:", Style::default().add_modifier(Modifier::BOLD)),
+        ]));
+        text_lines.push(Line::from(""));
+
+        for comment in &story.comments {
+            // Resolve author name from member cache
+            let author_name = app.member_cache.get(&comment.author_id)
+                .cloned()
+                .unwrap_or_else(|| comment.author_id.clone());
+
+            // Add author and timestamp
+            text_lines.push(Line::from(vec![
+                Span::styled(author_name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::raw(" - "),
+                Span::styled(comment.created_at.clone(), Style::default().fg(Color::DarkGray)),
+            ]));
+
+            // Add comment text with proper line wrapping
+            for line in comment.text.lines() {
+                text_lines.push(Line::from(format!("  {}", line)));
+            }
+            text_lines.push(Line::from(""));
+        }
+    }
+
+    // Calculate scrollable content
+    let total_lines = text_lines.len();
+    let content_height = area.height.saturating_sub(2) as usize; // Account for borders
+    let visible_lines = if total_lines > content_height {
+        content_height
+    } else {
+        total_lines
+    };
+
+    // Apply scroll offset
+    let start_line = app.detail_scroll_offset.min(total_lines.saturating_sub(visible_lines));
+    let end_line = (start_line + visible_lines).min(total_lines);
+    let visible_text_lines = if start_line < total_lines {
+        text_lines[start_line..end_line].to_vec()
+    } else {
+        text_lines
+    };
+
+    // Create title with scroll indicator
+    let scroll_indicator = if total_lines > content_height {
+        format!(" Story Details ({}/{}) ", start_line + 1, total_lines.saturating_sub(content_height) + 1)
+    } else {
+        " Story Details ".to_string()
+    };
+
+    let paragraph = Paragraph::new(visible_text_lines)
         .block(
             Block::default()
-                .title("Story Details")
+                .title(scroll_indicator)
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Yellow)),
         )

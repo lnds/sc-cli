@@ -20,6 +20,7 @@ mod tests {
                 position: 1000,
                 created_at: "2024-01-01T00:00:00Z".to_string(),
                 updated_at: "2024-01-02T00:00:00Z".to_string(),
+                comments: vec![],
             },
         ];
 
@@ -160,6 +161,7 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
             Story {
                 id: 2,
@@ -173,6 +175,7 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
         ];
 
@@ -239,6 +242,7 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
             Story {
                 id: 2,
@@ -252,6 +256,7 @@ mod tests {
                 position: 2000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
         ];
 
@@ -315,6 +320,7 @@ mod tests {
                 position: 1000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
             Story {
                 id: 2,
@@ -328,6 +334,7 @@ mod tests {
                 position: 2000,
                 created_at: "".to_string(),
                 updated_at: "".to_string(),
+                comments: vec![],
             },
         ];
 

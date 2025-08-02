@@ -18,6 +18,10 @@ mod tests {
             unimplemented!()
         }
 
+        fn get_story(&self, _story_id: i64) -> Result<Story> {
+            unimplemented!()
+        }
+
         fn update_story_state(&self, _story_id: i64, _workflow_state_id: i64) -> Result<Story> {
             unimplemented!()
         }

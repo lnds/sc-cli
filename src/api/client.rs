@@ -139,6 +139,45 @@ impl ShortcutApi for ShortcutClient {
         Ok(workflows)
     }
 
+    fn get_story(&self, story_id: i64) -> Result<Story> {
+        let url = format!("{}/stories/{}", self.base_url, story_id);
+        
+        if self.debug {
+            eprintln!("Fetching story #{story_id}...");
+        }
+        
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .context("Failed to send story request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Story response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            if status.as_u16() == 404 {
+                anyhow::bail!("Story #{story_id} not found");
+            } else {
+                anyhow::bail!("Failed to get story: {}. Error: {}", status, error_text);
+            }
+        }
+
+        let story: Story = response
+            .json()
+            .context("Failed to parse story response")?;
+
+        if self.debug {
+            eprintln!("Successfully fetched story #{} - {}", story.id, story.name);
+        }
+
+        Ok(story)
+    }
+
     fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story> {
         let url = format!("{}/stories/{}", self.base_url, story_id);
         

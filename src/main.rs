@@ -85,8 +85,8 @@ enum Command {
     },
     /// Mark a story as finished (Done state)
     Finish {
-        /// Story ID to mark as finished
-        story_id: i64,
+        /// Story ID to mark as finished (e.g., 42 or sc-42)
+        story_id: String,
 
         /// Shortcut API token (optional if using workspace)
         #[arg(short, long)]
@@ -305,7 +305,15 @@ fn handle_add_command(workspace: Option<String>, token: Option<String>, name: Ve
     Ok(())
 }
 
-fn handle_finish_command(workspace: Option<String>, token: Option<String>, story_id: i64, debug: bool) -> Result<()> {
+fn handle_finish_command(workspace: Option<String>, token: Option<String>, story_id: String, debug: bool) -> Result<()> {
+    // Parse story ID - accept both "42" and "sc-42" formats
+    let story_id = if story_id.to_lowercase().starts_with("sc-") {
+        story_id[3..].parse::<i64>()
+            .context("Invalid story ID format. Expected 'sc-N' where N is a number")?
+    } else {
+        story_id.parse::<i64>()
+            .context("Invalid story ID format. Expected a number or 'sc-N' format")?
+    };
     // Get token from args or config
     // Priority: 1. Explicit workspace, 2. Default workspace (if no token), 3. Token from CLI
     let token = if let Some(workspace_name) = workspace {

@@ -29,6 +29,8 @@ pub struct Story {
     pub moved_at: Option<String>,
     #[serde(default)]
     pub comments: Vec<Comment>,
+    #[serde(default)]
+    pub formatted_vcs_branch_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

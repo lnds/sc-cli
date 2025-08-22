@@ -18,6 +18,7 @@ fn test_story_editor_from_story() {
         completed_at: None,
         moved_at: None,
         comments: vec![],
+        formatted_vcs_branch_name: None,
     };
 
     let editor = StoryEditor::from_story(&story);

@@ -23,6 +23,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 2,
@@ -39,6 +40,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 3,
@@ -55,6 +57,7 @@ mod tests {
                 completed_at: Some("2025-08-01T10:00:00Z".to_string()),
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ]
     }
@@ -257,6 +260,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 1,
@@ -273,6 +277,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 2,
@@ -289,6 +294,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
         
@@ -427,6 +433,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 2,
@@ -443,6 +450,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
 
@@ -504,6 +512,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
 
@@ -594,6 +603,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
 

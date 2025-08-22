@@ -896,29 +896,53 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
             let branch_name = app.git_popup_state.branch_name.clone();
             let worktree_path = app.git_popup_state.worktree_path.clone();
             let selected_option = app.git_popup_state.selected_option.clone();
+            let story_id = app.git_popup_state.story_id;
+            
+            let mut result_message = String::new();
+            let mut operation_success = false;
+            let mut should_move_to_progress = false;
+            let operation_type = match selected_option {
+                ui::GitBranchOption::CreateBranch => ui::GitOperationType::CreateBranch,
+                ui::GitBranchOption::CreateWorktree => ui::GitOperationType::CreateWorktree,
+                ui::GitBranchOption::Cancel => {
+                    // Reset git request state and return early
+                    app.git_branch_requested = false;
+                    app.git_popup_state = ui::GitBranchPopupState {
+                        branch_name: String::new(),
+                        worktree_path: String::new(),
+                        selected_option: ui::GitBranchOption::CreateBranch,
+                        story_id: 0,
+                        editing_branch_name: false,
+                        editing_worktree_path: false,
+                        branch_cursor_pos: 0,
+                        worktree_cursor_pos: 0,
+                    };
+                    continue;
+                }
+            };
             
             match selected_option {
                 ui::GitBranchOption::CreateBranch => {
                     // Check if branch already exists
                     match git::branch_exists(&branch_name) {
                         Ok(true) => {
-                            eprintln!("❌ Branch '{branch_name}' already exists");
+                            result_message = format!("Branch '{}' already exists", branch_name);
                         }
                         Ok(false) => {
                             // Create the branch
                             match git::create_branch(&branch_name) {
                                 Ok(()) => {
-                                    if debug {
-                                        eprintln!("✅ Successfully created and switched to branch '{branch_name}'");
-                                    }
+                                    result_message = format!("Successfully created and switched to branch '{}'", branch_name);
+                                    operation_success = true;
+                                    should_move_to_progress = true;
                                 }
                                 Err(e) => {
-                                    eprintln!("❌ Failed to create branch '{branch_name}': {e}");
+                                    result_message = format!("Failed to create branch '{}': {}", branch_name, e);
                                 }
                             }
                         }
                         Err(e) => {
-                            eprintln!("❌ Failed to check if branch exists: {e}");
+                            result_message = format!("Failed to check if branch exists: {}", e);
                         }
                     }
                 }
@@ -926,19 +950,68 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     // Create worktree for bare repository
                     match git::create_worktree(&branch_name, &worktree_path) {
                         Ok(()) => {
-                            if debug {
-                                eprintln!("✅ Successfully created worktree '{branch_name}' at '{worktree_path}'");
-                            }
+                            result_message = format!("Successfully created worktree '{}' at '{}'", branch_name, worktree_path);
+                            operation_success = true;
+                            should_move_to_progress = true;
                         }
                         Err(e) => {
-                            eprintln!("❌ Failed to create worktree: {e}");
+                            result_message = format!("Failed to create worktree: {}", e);
                         }
                     }
                 }
                 ui::GitBranchOption::Cancel => {
-                    // Do nothing
+                    // Already handled above
                 }
             }
+            
+            // Move story to In Progress if operation was successful
+            if should_move_to_progress && story_id > 0 {
+                // Find an "In Progress" or "started" state
+                let in_progress_state_id = app.workflows.iter()
+                    .flat_map(|w| &w.states)
+                    .find(|state| state.state_type == "started" || 
+                                 state.name.to_lowercase().contains("progress") ||
+                                 state.name.to_lowercase().contains("doing"))
+                    .map(|state| state.id);
+                
+                if let Some(target_state_id) = in_progress_state_id {
+                    // Update the story state
+                    match client.update_story_state(story_id, target_state_id) {
+                        Ok(updated_story) => {
+                            if debug {
+                                eprintln!("✅ Moved story {} to In Progress state", story_id);
+                            }
+                            // Update the app state with the updated story
+                            update_story_state(&mut app, story_id, updated_story);
+                        }
+                        Err(e) => {
+                            if debug {
+                                eprintln!("⚠️ Failed to move story to In Progress: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Show result popup
+            app.git_result_state = ui::GitResultState {
+                success: operation_success,
+                operation_type,
+                message: result_message,
+                branch_name: branch_name.clone(),
+                worktree_path: if matches!(selected_option, ui::GitBranchOption::CreateWorktree) && operation_success {
+                    Some(worktree_path)
+                } else {
+                    None
+                },
+                story_id,
+                selected_option: if matches!(selected_option, ui::GitBranchOption::CreateWorktree) && operation_success {
+                    ui::GitResultOption::ExitAndChange
+                } else {
+                    ui::GitResultOption::Continue
+                },
+            };
+            app.show_git_result_popup = true;
             
             // Reset git request state
             app.git_branch_requested = false;
@@ -980,6 +1053,22 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
         if app.should_quit {
             break;
         }
+    }
+
+    // Check if we need to exit and change directory for worktree
+    if let Ok(worktree_path) = std::env::var("SC_CLI_EXIT_AND_CD") {
+        // Remove the environment variable
+        unsafe {
+            std::env::remove_var("SC_CLI_EXIT_AND_CD");
+        }
+        
+        if debug {
+            eprintln!("Exiting and changing to worktree directory: {}", worktree_path);
+        }
+        
+        eprintln!("\n🚀 Exiting application.");
+        eprintln!("📁 Change to the worktree directory with:");
+        eprintln!("   cd {}", worktree_path);
     }
 
     Ok(())

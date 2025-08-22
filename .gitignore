@@ -37,3 +37,4 @@ config.toml
 # Added by cargo
 
 /target
+.mcp.json

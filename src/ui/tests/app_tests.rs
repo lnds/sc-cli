@@ -101,7 +101,7 @@ mod tests {
         assert!(!app.should_quit);
         assert_eq!(app.workflow_state_map.len(), 3);
         assert_eq!(app.workflow_states.len(), 3);
-        assert_eq!(app.stories_by_state.len(), 3);
+        assert_eq!(app.stories_by_state.len(), 2); // Only 2 because Done story is filtered out
     }
 
     #[test]

@@ -770,8 +770,11 @@ impl App {
                     // Create git branch for selected story
                     if self.git_context.is_git_repo() {
                         if let Some(story) = self.get_selected_story().cloned() {
-                            let suggested_branch = format!("sc-{}-{}", story.id, 
-                                story.name.replace(' ', "-").replace('/', "-").to_lowercase());
+                            // Use the formatted VCS branch name from Shortcut if available, otherwise generate one
+                            let suggested_branch = story.formatted_vcs_branch_name.unwrap_or_else(|| {
+                                format!("sc-{}-{}", story.id, 
+                                    story.name.replace([' ', '/'], "-").to_lowercase())
+                            });
                             self.show_git_popup = true;
                             self.git_popup_state = GitBranchPopupState {
                                 branch_name: suggested_branch.clone(),

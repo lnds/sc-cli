@@ -88,6 +88,7 @@ mod tests {
             completed_at: None,
             moved_at: None,
             comments: vec![],
+            formatted_vcs_branch_name: None,
         };
 
         let mock_api = MockApi {
@@ -128,6 +129,7 @@ mod tests {
             completed_at: None,
             moved_at: None,
             comments: vec![],
+            formatted_vcs_branch_name: None,
         };
 
         let mock_api = MockApi {

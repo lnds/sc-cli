@@ -23,6 +23,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
 
@@ -167,6 +168,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 2,
@@ -183,6 +185,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
 
@@ -254,6 +257,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 2,
@@ -270,6 +274,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
 
@@ -337,6 +342,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
             Story {
                 id: 2,
@@ -353,6 +359,7 @@ mod tests {
                 completed_at: None,
                 moved_at: None,
                 comments: vec![],
+                formatted_vcs_branch_name: None,
             },
         ];
 

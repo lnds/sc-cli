@@ -182,3 +182,19 @@ fn test_cli_finish_story_id_numeric() {
         .failure()
         .stderr(predicate::str::contains("invalid"));
 }
+
+#[test]
+fn test_cli_global_all_flag() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Test that --all flag is accepted globally with default command
+    cmd.arg("--all")
+        .assert()
+        .failure()  // Will fail due to no config, but should accept the flag
+        .stderr(
+            predicate::str::contains("No default workspace configured")
+                .or(predicate::str::contains("No configuration file found"))
+                .or(predicate::str::contains("Device not configured"))
+                .or(predicate::str::contains("Failed to initialize input reader"))
+                .or(predicate::str::contains("Error:"))  // Catch-all for terminal errors
+        );
+}

@@ -66,6 +66,30 @@ struct Args {
     #[arg(short, long, global = true)]
     debug: bool,
 
+    /// Show all stories (no owner/requester filter)
+    #[arg(long, global = true, conflicts_with_all = ["owner", "requester"])]
+    all: bool,
+
+    /// Show stories where user is the owner (default when no filter specified)
+    #[arg(long, global = true, conflicts_with_all = ["all", "requester"])]
+    owner: bool,
+
+    /// Show stories where user is the requester
+    #[arg(long, global = true, conflicts_with_all = ["all", "owner"])]
+    requester: bool,
+
+    /// Maximum number of stories to display (overrides workspace config)
+    #[arg(short, long, global = true)]
+    limit: Option<usize>,
+
+    /// Filter by story type (feature, bug, chore)
+    #[arg(long, global = true)]
+    story_type: Option<String>,
+
+    /// Custom search query using Shortcut's search syntax
+    #[arg(short, long, global = true)]
+    search: Option<String>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -189,12 +213,12 @@ fn main() -> Result<()> {
                 workspace: args.workspace,
                 username,
                 token,
-                limit,
-                story_type,
-                search,
-                all,
-                _owner: owner,
-                requester,
+                limit: limit.or(args.limit),
+                story_type: story_type.or(args.story_type),
+                search: search.or(args.search),
+                all: all || args.all,
+                _owner: owner || args.owner,
+                requester: requester || args.requester,
                 debug: args.debug,
             })
         }
@@ -204,11 +228,11 @@ fn main() -> Result<()> {
                 username,
                 token,
                 limit,
-                story_type,
-                search,
-                all,
-                _owner: owner,
-                requester,
+                story_type: story_type.or(args.story_type),
+                search: search.or(args.search),
+                all: all || args.all,
+                _owner: owner || args.owner,
+                requester: requester || args.requester,
                 debug: args.debug,
             })
         }
@@ -224,12 +248,12 @@ fn main() -> Result<()> {
                 workspace: args.workspace,
                 username: None,
                 token: None,
-                limit: None,
-                story_type: None,
-                search: None,
-                all: false,
-                _owner: false,
-                requester: false,
+                limit: args.limit,
+                story_type: args.story_type,
+                search: args.search,
+                all: args.all,
+                _owner: args.owner,
+                requester: args.requester,
                 debug: args.debug,
             })
         }

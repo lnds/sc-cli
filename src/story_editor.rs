@@ -42,7 +42,7 @@ impl StoryEditor {
             println!("  (no description)");
         } else {
             for line in self.description.lines() {
-                println!("  {}", line);
+                println!("  {line}");
             }
         }
 

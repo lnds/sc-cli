@@ -291,7 +291,7 @@ impl ShortcutApi for ShortcutClient {
         });
 
         if self.debug {
-            eprintln!("Updating story {story_id} details: name='{}', description='{}', type='{}'", name, description, story_type);
+            eprintln!("Updating story {story_id} details: name='{name}', description='{description}', type='{story_type}'");
         }
         
         let response = self

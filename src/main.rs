@@ -369,7 +369,7 @@ fn handle_finish_command(workspace: Option<String>, token: Option<String>, story
     
     if debug {
         eprintln!("Current user: {} ({}) - ID: {}", current_member.name, current_member.mention_name, current_member.id);
-        eprintln!("Marking story #{} as finished...", story_id);
+        eprintln!("Marking story #{story_id} as finished...");
     }
 
     // Update story to Done state (workflow_state_id: 500000010)
@@ -387,15 +387,15 @@ fn handle_finish_command(workspace: Option<String>, token: Option<String>, story
             }
         }
         Err(e) => {
-            eprintln!("❌ Failed to mark story as finished: {}", e);
+            eprintln!("❌ Failed to mark story as finished: {e}");
             
             if debug {
-                eprintln!("Error details: {:?}", e);
+                eprintln!("Error details: {e:?}");
             }
             
             // Check if it's a 404 error (story not found)
             if e.to_string().contains("404") {
-                eprintln!("💡 Story #{} was not found. Please check the story ID.", story_id);
+                eprintln!("💡 Story #{story_id} was not found. Please check the story ID.");
             } else if e.to_string().contains("422") {
                 eprintln!("💡 The story might already be in the Done state or there might be a workflow restriction.");
             }
@@ -477,7 +477,7 @@ fn handle_edit_command(workspace: Option<String>, token: Option<String>, story_i
     } else {
         println!("  Description:");
         for line in story.description.lines() {
-            println!("    {}", line);
+            println!("    {line}");
         }
     }
     println!("  URL: {}", story.app_url);
@@ -871,7 +871,7 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     // Update the story in our local data
                     update_story_details(&mut app, story_id, updated_story);
                     if debug {
-                        eprintln!("Successfully updated story #{}", story_id);
+                        eprintln!("Successfully updated story #{story_id}");
                     }
                 }
                 Err(e) => {
@@ -902,23 +902,23 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     // Check if branch already exists
                     match git::branch_exists(&branch_name) {
                         Ok(true) => {
-                            eprintln!("❌ Branch '{}' already exists", branch_name);
+                            eprintln!("❌ Branch '{branch_name}' already exists");
                         }
                         Ok(false) => {
                             // Create the branch
                             match git::create_branch(&branch_name) {
                                 Ok(()) => {
                                     if debug {
-                                        eprintln!("✅ Successfully created and switched to branch '{}'", branch_name);
+                                        eprintln!("✅ Successfully created and switched to branch '{branch_name}'");
                                     }
                                 }
                                 Err(e) => {
-                                    eprintln!("❌ Failed to create branch '{}': {}", branch_name, e);
+                                    eprintln!("❌ Failed to create branch '{branch_name}': {e}");
                                 }
                             }
                         }
                         Err(e) => {
-                            eprintln!("❌ Failed to check if branch exists: {}", e);
+                            eprintln!("❌ Failed to check if branch exists: {e}");
                         }
                     }
                 }
@@ -927,11 +927,11 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     match git::create_worktree(&branch_name, &worktree_path) {
                         Ok(()) => {
                             if debug {
-                                eprintln!("✅ Successfully created worktree '{}' at '{}'", branch_name, worktree_path);
+                                eprintln!("✅ Successfully created worktree '{branch_name}' at '{worktree_path}'");
                             }
                         }
                         Err(e) => {
-                            eprintln!("❌ Failed to create worktree: {}", e);
+                            eprintln!("❌ Failed to create worktree: {e}");
                         }
                     }
                 }

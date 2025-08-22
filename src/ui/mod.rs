@@ -1489,8 +1489,7 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         "Editing branch name | [Enter] save | [Esc] cancel edit | [Backspace] delete | Type to edit".to_string()
     } else {
         format!(
-            "Git repo: {} | Current branch: {} | [↑/↓] select | [Tab/e] edit name | [Enter] confirm | [Esc] cancel",
-            repo_type, current_branch
+            "Git repo: {repo_type} | Current branch: {current_branch} | [↑/↓] select | [Tab/e] edit name | [Enter] confirm | [Esc] cancel"
         )
     };
     
@@ -1598,8 +1597,7 @@ fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
         let total_stories = app.all_stories_list.len();
         let showing_start = start_idx + 1;
         let showing_end = end_idx;
-        format!(" All Stories ({}) - List View ({}-{} of {}) ", 
-            total_stories, showing_start, showing_end, total_stories)
+        format!(" All Stories ({total_stories}) - List View ({showing_start}-{showing_end} of {total_stories}) ")
     } else {
         format!(" All Stories ({}) - List View ", app.all_stories_list.len())
     };

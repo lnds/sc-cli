@@ -926,23 +926,23 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     // Check if branch already exists
                     match git::branch_exists(&branch_name) {
                         Ok(true) => {
-                            result_message = format!("Branch '{}' already exists", branch_name);
+                            result_message = format!("Branch '{branch_name}' already exists");
                         }
                         Ok(false) => {
                             // Create the branch
                             match git::create_branch(&branch_name) {
                                 Ok(()) => {
-                                    result_message = format!("Successfully created and switched to branch '{}'", branch_name);
+                                    result_message = format!("Successfully created and switched to branch '{branch_name}'");
                                     operation_success = true;
                                     should_move_to_progress = true;
                                 }
                                 Err(e) => {
-                                    result_message = format!("Failed to create branch '{}': {}", branch_name, e);
+                                    result_message = format!("Failed to create branch '{branch_name}': {e}");
                                 }
                             }
                         }
                         Err(e) => {
-                            result_message = format!("Failed to check if branch exists: {}", e);
+                            result_message = format!("Failed to check if branch exists: {e}");
                         }
                     }
                 }
@@ -950,12 +950,12 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     // Create worktree for bare repository
                     match git::create_worktree(&branch_name, &worktree_path) {
                         Ok(()) => {
-                            result_message = format!("Successfully created worktree '{}' at '{}'", branch_name, worktree_path);
+                            result_message = format!("Successfully created worktree '{branch_name}' at '{worktree_path}'");
                             operation_success = true;
                             should_move_to_progress = true;
                         }
                         Err(e) => {
-                            result_message = format!("Failed to create worktree: {}", e);
+                            result_message = format!("Failed to create worktree: {e}");
                         }
                     }
                 }
@@ -979,14 +979,14 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     match client.update_story_state(story_id, target_state_id) {
                         Ok(updated_story) => {
                             if debug {
-                                eprintln!("✅ Moved story {} to In Progress state", story_id);
+                                eprintln!("✅ Moved story {story_id} to In Progress state");
                             }
                             // Update the app state with the updated story
                             update_story_state(&mut app, story_id, updated_story);
                         }
                         Err(e) => {
                             if debug {
-                                eprintln!("⚠️ Failed to move story to In Progress: {}", e);
+                                eprintln!("⚠️ Failed to move story to In Progress: {e}");
                             }
                         }
                     }
@@ -1063,12 +1063,12 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
         }
         
         if debug {
-            eprintln!("Exiting and changing to worktree directory: {}", worktree_path);
+            eprintln!("Exiting and changing to worktree directory: {worktree_path}");
         }
         
         eprintln!("\n🚀 Exiting application.");
         eprintln!("📁 Change to the worktree directory with:");
-        eprintln!("   cd {}", worktree_path);
+        eprintln!("   cd {worktree_path}");
     }
 
     Ok(())
@@ -1342,7 +1342,7 @@ fn show_stories_paginated(
             // Get emoji and color based on story type
             let (type_emoji, type_color) = match story.story_type.as_str() {
                 "feature" => ("✨", "\x1b[32m"), // Green for features
-                "bug" => ("🐛", "\x1b[31m"),      // Red for bugs  
+                "bug" => ("🐞", "\x1b[31m"),      // Red for bugs  
                 "chore" => ("⚙️", "\x1b[34m"),    // Blue for chores
                 _ => ("📝", "\x1b[37m"),          // Default gray
             };

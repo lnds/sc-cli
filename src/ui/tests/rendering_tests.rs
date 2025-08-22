@@ -232,7 +232,7 @@ mod tests {
         
         // Check both stories are rendered
         assert!(buffer_str.contains("[#1]"));
-        assert!(buffer_str.contains("🐛")); // Bug type icon
+        assert!(buffer_str.contains("🐞")); // Bug type icon
         assert!(buffer_str.contains("First Story"));
         assert!(buffer_str.contains("[#2]"));
         assert!(buffer_str.contains("🔧")); // Chore type icon
@@ -320,7 +320,7 @@ mod tests {
         assert!(buffer_str.contains("ThisIsAVeryLongStoryName"));
         
         // Check that the normal story wraps properly
-        assert!(buffer_str.contains("[#2] 🐛"));
+        assert!(buffer_str.contains("[#2] 🐞"));
         assert!(buffer_str.contains("This is a normal story name"));
     }
 

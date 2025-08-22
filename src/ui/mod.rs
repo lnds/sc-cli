@@ -1,4 +1,5 @@
 use crate::api::{Story, Workflow};
+use crate::git::GitContext;
 use chrono::{DateTime, Datelike, Duration, Utc, Weekday};
 use crossterm::event::{self, KeyCode};
 use ratatui::{
@@ -86,6 +87,11 @@ pub struct App {
     pub load_more_requested: bool, // Flag to request loading more stories
     pub is_loading: bool, // Flag to show loading state
     pub total_loaded_stories: usize, // Count of total stories loaded
+    // Git integration state
+    pub git_context: GitContext, // Git repository context
+    pub show_git_popup: bool, // Flag to show git branch creation popup
+    pub git_popup_state: GitBranchPopupState, // Git popup state
+    pub git_branch_requested: bool, // Flag to request git branch creation
 }
 
 #[derive(Debug, Clone)]
@@ -119,6 +125,21 @@ pub enum EditField {
     Name,
     Description,
     Type,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitBranchPopupState {
+    pub branch_name: String,
+    pub worktree_path: String,
+    pub selected_option: GitBranchOption,
+    pub story_id: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GitBranchOption {
+    CreateBranch,
+    CreateWorktree,
+    Cancel,
 }
 
 impl Default for CreatePopupState {
@@ -233,6 +254,11 @@ impl App {
         let mut all_stories_list = filtered_stories.clone();
         all_stories_list.sort_by_key(|s| s.position);
         
+        let git_context = GitContext::detect().unwrap_or(GitContext {
+            repo_type: crate::git::GitRepoType::NotARepo,
+            current_branch: None,
+        });
+
         Self {
             show_detail: false,
             show_state_selector: false,
@@ -270,6 +296,15 @@ impl App {
             load_more_requested: false,
             is_loading: false,
             total_loaded_stories: total_stories,
+            git_context,
+            show_git_popup: false,
+            git_popup_state: GitBranchPopupState {
+                branch_name: String::new(),
+                worktree_path: String::new(),
+                selected_option: GitBranchOption::CreateBranch,
+                story_id: 0,
+            },
+            git_branch_requested: false,
         }
     }
 
@@ -465,7 +500,74 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
-        if self.show_edit_popup {
+        if self.show_git_popup {
+            // Handle git popup input
+            match key.code {
+                KeyCode::Esc => {
+                    self.show_git_popup = false;
+                    self.git_popup_state = GitBranchPopupState {
+                        branch_name: String::new(),
+                        worktree_path: String::new(),
+                        selected_option: GitBranchOption::CreateBranch,
+                        story_id: 0,
+                    };
+                }
+                KeyCode::Enter => {
+                    match self.git_popup_state.selected_option {
+                        GitBranchOption::CreateBranch | GitBranchOption::CreateWorktree => {
+                            self.git_branch_requested = true;
+                            self.show_git_popup = false;
+                        }
+                        GitBranchOption::Cancel => {
+                            self.show_git_popup = false;
+                        }
+                    }
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    match self.git_popup_state.selected_option {
+                        GitBranchOption::CreateBranch => {
+                            self.git_popup_state.selected_option = GitBranchOption::Cancel;
+                        }
+                        GitBranchOption::CreateWorktree => {
+                            if self.git_context.is_bare_repo() {
+                                self.git_popup_state.selected_option = GitBranchOption::Cancel;
+                            } else {
+                                self.git_popup_state.selected_option = GitBranchOption::CreateBranch;
+                            }
+                        }
+                        GitBranchOption::Cancel => {
+                            if self.git_context.is_bare_repo() {
+                                self.git_popup_state.selected_option = GitBranchOption::CreateWorktree;
+                            } else {
+                                self.git_popup_state.selected_option = GitBranchOption::CreateBranch;
+                            }
+                        }
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    match self.git_popup_state.selected_option {
+                        GitBranchOption::CreateBranch => {
+                            if self.git_context.is_bare_repo() {
+                                self.git_popup_state.selected_option = GitBranchOption::Cancel;
+                            } else {
+                                self.git_popup_state.selected_option = GitBranchOption::CreateWorktree;
+                            }
+                        }
+                        GitBranchOption::CreateWorktree => {
+                            self.git_popup_state.selected_option = GitBranchOption::Cancel;
+                        }
+                        GitBranchOption::Cancel => {
+                            if self.git_context.is_bare_repo() {
+                                self.git_popup_state.selected_option = GitBranchOption::CreateWorktree;
+                            } else {
+                                self.git_popup_state.selected_option = GitBranchOption::CreateBranch;
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        } else if self.show_edit_popup {
             // Handle edit popup input
             match key.code {
                 KeyCode::Esc => {
@@ -664,6 +766,26 @@ impl App {
                     // Toggle view mode between columns and list
                     self.toggle_view_mode();
                 }
+                KeyCode::Char('g') => {
+                    // Create git branch for selected story
+                    if self.git_context.is_git_repo() {
+                        if let Some(story) = self.get_selected_story().cloned() {
+                            let suggested_branch = format!("sc-{}-{}", story.id, 
+                                story.name.replace(' ', "-").replace('/', "-").to_lowercase());
+                            self.show_git_popup = true;
+                            self.git_popup_state = GitBranchPopupState {
+                                branch_name: suggested_branch.clone(),
+                                worktree_path: crate::git::generate_worktree_path(&suggested_branch),
+                                selected_option: if self.git_context.is_bare_repo() { 
+                                    GitBranchOption::CreateWorktree 
+                                } else { 
+                                    GitBranchOption::CreateBranch 
+                                },
+                                story_id: story.id,
+                            };
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -848,6 +970,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     // Edit story popup
     if app.show_edit_popup {
         draw_edit_popup(frame, app);
+    }
+    
+    // Git branch popup
+    if app.show_git_popup {
+        draw_git_popup(frame, app);
     }
 }
 
@@ -1213,6 +1340,107 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
     frame.render_widget(help, chunks[4]);
+}
+
+fn draw_git_popup(frame: &mut Frame, app: &App) {
+    let area = centered_rect(60, 40, frame.area());
+    frame.render_widget(Clear, area);
+    
+    // Create the main popup block
+    let popup = Block::default()
+        .title("Create Git Branch")
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::Black).fg(Color::White));
+    frame.render_widget(popup, area);
+    
+    // Create inner area for content
+    let inner = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+    
+    // Create layout chunks
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Branch name
+            Constraint::Length(3), // Worktree path (if bare repo)
+            Constraint::Min(4),    // Options
+            Constraint::Length(2), // Help text
+        ])
+        .split(inner);
+    
+    // Branch name field
+    let branch_block = Block::default()
+        .title("Branch Name")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow));
+    let branch_text = Paragraph::new(app.git_popup_state.branch_name.as_str())
+        .block(branch_block);
+    frame.render_widget(branch_text, chunks[0]);
+    
+    // Worktree path field (only for bare repos)
+    if app.git_context.is_bare_repo() {
+        let worktree_block = Block::default()
+            .title("Worktree Path")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Blue));
+        let worktree_text = Paragraph::new(app.git_popup_state.worktree_path.as_str())
+            .block(worktree_block);
+        frame.render_widget(worktree_text, chunks[1]);
+    }
+    
+    // Options
+    let mut options = Vec::new();
+    
+    if !app.git_context.is_bare_repo() {
+        let create_branch_style = if app.git_popup_state.selected_option == GitBranchOption::CreateBranch {
+            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        options.push(ListItem::new("Create Branch").style(create_branch_style));
+    }
+    
+    if app.git_context.is_bare_repo() {
+        let create_worktree_style = if app.git_popup_state.selected_option == GitBranchOption::CreateWorktree {
+            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        options.push(ListItem::new("Create Worktree").style(create_worktree_style));
+    }
+    
+    let cancel_style = if app.git_popup_state.selected_option == GitBranchOption::Cancel {
+        Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    options.push(ListItem::new("Cancel").style(cancel_style));
+    
+    let list = List::new(options)
+        .block(Block::default()
+            .title("Options")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow)));
+    
+    frame.render_widget(list, chunks[2]);
+    
+    // Help text
+    let repo_type = if app.git_context.is_bare_repo() { "bare" } else { "normal" };
+    let current_branch = app.git_context.current_branch.as_deref().unwrap_or("unknown");
+    let help_text = format!(
+        "Git repo: {} | Current branch: {} | [↑/↓] select | [Enter] confirm | [Esc] cancel",
+        repo_type, current_branch
+    );
+    
+    let help = Paragraph::new(help_text)
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(help, chunks[3]);
 }
 
 fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {

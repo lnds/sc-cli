@@ -1,5 +1,6 @@
 mod api;
 mod config;
+mod git;
 mod story_creator;
 mod story_editor;
 mod ui;
@@ -888,6 +889,65 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                 story_id: 0,
             };
             app.edit_story_requested = false;
+        }
+
+        // Check if we need to handle git branch creation
+        if app.git_branch_requested {
+            let branch_name = app.git_popup_state.branch_name.clone();
+            let worktree_path = app.git_popup_state.worktree_path.clone();
+            let selected_option = app.git_popup_state.selected_option.clone();
+            
+            match selected_option {
+                ui::GitBranchOption::CreateBranch => {
+                    // Check if branch already exists
+                    match git::branch_exists(&branch_name) {
+                        Ok(true) => {
+                            eprintln!("❌ Branch '{}' already exists", branch_name);
+                        }
+                        Ok(false) => {
+                            // Create the branch
+                            match git::create_branch(&branch_name) {
+                                Ok(()) => {
+                                    if debug {
+                                        eprintln!("✅ Successfully created and switched to branch '{}'", branch_name);
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("❌ Failed to create branch '{}': {}", branch_name, e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("❌ Failed to check if branch exists: {}", e);
+                        }
+                    }
+                }
+                ui::GitBranchOption::CreateWorktree => {
+                    // Create worktree for bare repository
+                    match git::create_worktree(&branch_name, &worktree_path) {
+                        Ok(()) => {
+                            if debug {
+                                eprintln!("✅ Successfully created worktree '{}' at '{}'", branch_name, worktree_path);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("❌ Failed to create worktree: {}", e);
+                        }
+                    }
+                }
+                ui::GitBranchOption::Cancel => {
+                    // Do nothing
+                }
+            }
+            
+            // Reset git request state
+            app.git_branch_requested = false;
+            app.git_popup_state = ui::GitBranchPopupState {
+                branch_name: String::new(),
+                worktree_path: String::new(),
+                selected_option: ui::GitBranchOption::CreateBranch,
+                story_id: 0,
+            };
         }
 
         // Check if we need to load more stories

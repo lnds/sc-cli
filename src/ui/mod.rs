@@ -133,6 +133,7 @@ pub struct GitBranchPopupState {
     pub worktree_path: String,
     pub selected_option: GitBranchOption,
     pub story_id: i64,
+    pub editing_branch_name: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -303,6 +304,7 @@ impl App {
                 worktree_path: String::new(),
                 selected_option: GitBranchOption::CreateBranch,
                 story_id: 0,
+                editing_branch_name: false,
             },
             git_branch_requested: false,
         }
@@ -502,28 +504,58 @@ impl App {
     pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
         if self.show_git_popup {
             // Handle git popup input
-            match key.code {
-                KeyCode::Esc => {
-                    self.show_git_popup = false;
-                    self.git_popup_state = GitBranchPopupState {
-                        branch_name: String::new(),
-                        worktree_path: String::new(),
-                        selected_option: GitBranchOption::CreateBranch,
-                        story_id: 0,
-                    };
-                }
-                KeyCode::Enter => {
-                    match self.git_popup_state.selected_option {
-                        GitBranchOption::CreateBranch | GitBranchOption::CreateWorktree => {
-                            self.git_branch_requested = true;
-                            self.show_git_popup = false;
-                        }
-                        GitBranchOption::Cancel => {
-                            self.show_git_popup = false;
+            if self.git_popup_state.editing_branch_name {
+                // Handle branch name editing
+                match key.code {
+                    KeyCode::Esc => {
+                        self.git_popup_state.editing_branch_name = false;
+                    }
+                    KeyCode::Enter => {
+                        self.git_popup_state.editing_branch_name = false;
+                        // Update worktree path when branch name changes
+                        self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
+                    }
+                    KeyCode::Backspace => {
+                        if !self.git_popup_state.branch_name.is_empty() {
+                            self.git_popup_state.branch_name.pop();
+                            self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
                         }
                     }
+                    KeyCode::Char(c) => {
+                        self.git_popup_state.branch_name.push(c);
+                        self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
+                    }
+                    _ => {}
                 }
-                KeyCode::Up | KeyCode::Char('k') => {
+            } else {
+                // Handle normal git popup navigation
+                match key.code {
+                    KeyCode::Esc => {
+                        self.show_git_popup = false;
+                        self.git_popup_state = GitBranchPopupState {
+                            branch_name: String::new(),
+                            worktree_path: String::new(),
+                            selected_option: GitBranchOption::CreateBranch,
+                            story_id: 0,
+                            editing_branch_name: false,
+                        };
+                    }
+                    KeyCode::Enter => {
+                        match self.git_popup_state.selected_option {
+                            GitBranchOption::CreateBranch | GitBranchOption::CreateWorktree => {
+                                self.git_branch_requested = true;
+                                self.show_git_popup = false;
+                            }
+                            GitBranchOption::Cancel => {
+                                self.show_git_popup = false;
+                            }
+                        }
+                    }
+                    KeyCode::Tab | KeyCode::Char('e') => {
+                        // Enter branch name editing mode
+                        self.git_popup_state.editing_branch_name = true;
+                    }
+                    KeyCode::Up | KeyCode::Char('k') => {
                     match self.git_popup_state.selected_option {
                         GitBranchOption::CreateBranch => {
                             self.git_popup_state.selected_option = GitBranchOption::Cancel;
@@ -565,7 +597,8 @@ impl App {
                         }
                     }
                 }
-                _ => {}
+                    _ => {}
+                }
             }
         } else if self.show_edit_popup {
             // Handle edit popup input
@@ -785,6 +818,7 @@ impl App {
                                     GitBranchOption::CreateBranch 
                                 },
                                 story_id: story.id,
+                                editing_branch_name: false,
                             };
                         }
                     }
@@ -1376,11 +1410,28 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         .split(inner);
     
     // Branch name field
+    let branch_title = if app.git_popup_state.editing_branch_name {
+        "Branch Name (editing...)"
+    } else {
+        "Branch Name [Tab/e to edit]"
+    };
+    let branch_border_style = if app.git_popup_state.editing_branch_name {
+        Style::default().fg(Color::Green)
+    } else {
+        Style::default().fg(Color::Yellow)
+    };
     let branch_block = Block::default()
-        .title("Branch Name")
+        .title(branch_title)
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow));
-    let branch_text = Paragraph::new(app.git_popup_state.branch_name.as_str())
+        .border_style(branch_border_style);
+    
+    let branch_content = if app.git_popup_state.editing_branch_name {
+        format!("{}_", app.git_popup_state.branch_name) // Show cursor
+    } else {
+        app.git_popup_state.branch_name.clone()
+    };
+    
+    let branch_text = Paragraph::new(branch_content)
         .block(branch_block);
     frame.render_widget(branch_text, chunks[0]);
     
@@ -1434,10 +1485,14 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
     // Help text
     let repo_type = if app.git_context.is_bare_repo() { "bare" } else { "normal" };
     let current_branch = app.git_context.current_branch.as_deref().unwrap_or("unknown");
-    let help_text = format!(
-        "Git repo: {} | Current branch: {} | [↑/↓] select | [Enter] confirm | [Esc] cancel",
-        repo_type, current_branch
-    );
+    let help_text = if app.git_popup_state.editing_branch_name {
+        "Editing branch name | [Enter] save | [Esc] cancel edit | [Backspace] delete | Type to edit".to_string()
+    } else {
+        format!(
+            "Git repo: {} | Current branch: {} | [↑/↓] select | [Tab/e] edit name | [Enter] confirm | [Esc] cancel",
+            repo_type, current_branch
+        )
+    };
     
     let help = Paragraph::new(help_text)
         .style(Style::default().fg(Color::DarkGray))

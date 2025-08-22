@@ -151,10 +151,13 @@ pub enum GitBranchOption {
 #[derive(Debug, Clone)]
 pub struct GitResultState {
     pub success: bool,
+    #[allow(dead_code)]
     pub operation_type: GitOperationType,
     pub message: String,
+    #[allow(dead_code)]
     pub branch_name: String,
     pub worktree_path: Option<String>,
+    #[allow(dead_code)]
     pub story_id: i64,
     pub selected_option: GitResultOption,
 }
@@ -1855,7 +1858,7 @@ fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
             // Get icon for story type
             let type_icon = match story.story_type.as_str() {
                 "feature" => "✨",
-                "bug" => "🐛",
+                "bug" => "🐞",
                 "chore" => "🔧",
                 _ => "📝",
             };
@@ -1969,7 +1972,7 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                     // Get icon for story type
                     let type_icon = match story.story_type.as_str() {
                         "feature" => "✨",
-                        "bug" => "🐛",
+                        "bug" => "🐞",
                         "chore" => "🔧",
                         _ => "📝",
                     };

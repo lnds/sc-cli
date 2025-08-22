@@ -170,6 +170,8 @@ enum Command {
         #[arg(short, long)]
         token: Option<String>,
     },
+    /// Display the version of sc-cli
+    Version,
 }
 
 fn main() -> Result<()> {
@@ -213,6 +215,9 @@ fn main() -> Result<()> {
         Some(Command::Edit { story_id, token }) => {
             handle_edit_command(args.workspace, token, story_id, args.debug)
         }
+        Some(Command::Version) => {
+            handle_version_command()
+        }
         None => {
             // Default to view command when no subcommand is specified
             handle_view_command(ViewCommandArgs {
@@ -229,6 +234,11 @@ fn main() -> Result<()> {
             })
         }
     }
+}
+
+fn handle_version_command() -> Result<()> {
+    println!("sc-cli {}", env!("CARGO_PKG_VERSION"));
+    Ok(())
 }
 
 fn handle_add_command(workspace: Option<String>, token: Option<String>, name: Vec<String>, story_type: Option<String>, debug: bool) -> Result<()> {

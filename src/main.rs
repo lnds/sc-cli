@@ -948,6 +948,9 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                 selected_option: ui::GitBranchOption::CreateBranch,
                 story_id: 0,
                 editing_branch_name: false,
+                editing_worktree_path: false,
+                branch_cursor_pos: 0,
+                worktree_cursor_pos: 0,
             };
         }
 

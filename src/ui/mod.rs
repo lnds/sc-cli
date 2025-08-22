@@ -134,6 +134,9 @@ pub struct GitBranchPopupState {
     pub selected_option: GitBranchOption,
     pub story_id: i64,
     pub editing_branch_name: bool,
+    pub editing_worktree_path: bool,
+    pub branch_cursor_pos: usize,
+    pub worktree_cursor_pos: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -305,6 +308,9 @@ impl App {
                 selected_option: GitBranchOption::CreateBranch,
                 story_id: 0,
                 editing_branch_name: false,
+                editing_worktree_path: false,
+                branch_cursor_pos: 0,
+                worktree_cursor_pos: 0,
             },
             git_branch_requested: false,
         }
@@ -514,16 +520,102 @@ impl App {
                         self.git_popup_state.editing_branch_name = false;
                         // Update worktree path when branch name changes
                         self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
+                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
+                    }
+                    KeyCode::Left => {
+                        if self.git_popup_state.branch_cursor_pos > 0 {
+                            self.git_popup_state.branch_cursor_pos -= 1;
+                        }
+                    }
+                    KeyCode::Right => {
+                        if self.git_popup_state.branch_cursor_pos < self.git_popup_state.branch_name.len() {
+                            self.git_popup_state.branch_cursor_pos += 1;
+                        }
+                    }
+                    KeyCode::Home => {
+                        self.git_popup_state.branch_cursor_pos = 0;
+                    }
+                    KeyCode::End => {
+                        self.git_popup_state.branch_cursor_pos = self.git_popup_state.branch_name.len();
+                    }
+                    KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        // Ctrl+A: Go to beginning of line
+                        self.git_popup_state.branch_cursor_pos = 0;
+                    }
+                    KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        // Ctrl+E: Go to end of line
+                        self.git_popup_state.branch_cursor_pos = self.git_popup_state.branch_name.len();
                     }
                     KeyCode::Backspace => {
-                        if !self.git_popup_state.branch_name.is_empty() {
-                            self.git_popup_state.branch_name.pop();
+                        if self.git_popup_state.branch_cursor_pos > 0 {
+                            self.git_popup_state.branch_name.remove(self.git_popup_state.branch_cursor_pos - 1);
+                            self.git_popup_state.branch_cursor_pos -= 1;
                             self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
+                            self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
+                        }
+                    }
+                    KeyCode::Delete => {
+                        if self.git_popup_state.branch_cursor_pos < self.git_popup_state.branch_name.len() {
+                            self.git_popup_state.branch_name.remove(self.git_popup_state.branch_cursor_pos);
+                            self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
+                            self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
                         }
                     }
                     KeyCode::Char(c) => {
-                        self.git_popup_state.branch_name.push(c);
+                        self.git_popup_state.branch_name.insert(self.git_popup_state.branch_cursor_pos, c);
+                        self.git_popup_state.branch_cursor_pos += 1;
                         self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
+                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
+                    }
+                    _ => {}
+                }
+            } else if self.git_popup_state.editing_worktree_path {
+                // Handle worktree path editing
+                match key.code {
+                    KeyCode::Esc => {
+                        self.git_popup_state.editing_worktree_path = false;
+                    }
+                    KeyCode::Enter => {
+                        self.git_popup_state.editing_worktree_path = false;
+                    }
+                    KeyCode::Left => {
+                        if self.git_popup_state.worktree_cursor_pos > 0 {
+                            self.git_popup_state.worktree_cursor_pos -= 1;
+                        }
+                    }
+                    KeyCode::Right => {
+                        if self.git_popup_state.worktree_cursor_pos < self.git_popup_state.worktree_path.len() {
+                            self.git_popup_state.worktree_cursor_pos += 1;
+                        }
+                    }
+                    KeyCode::Home => {
+                        self.git_popup_state.worktree_cursor_pos = 0;
+                    }
+                    KeyCode::End => {
+                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
+                    }
+                    KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        // Ctrl+A: Go to beginning of line
+                        self.git_popup_state.worktree_cursor_pos = 0;
+                    }
+                    KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        // Ctrl+E: Go to end of line
+                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
+                    }
+                    KeyCode::Backspace => {
+                        if self.git_popup_state.worktree_cursor_pos > 0 {
+                            self.git_popup_state.worktree_path.remove(self.git_popup_state.worktree_cursor_pos - 1);
+                            self.git_popup_state.worktree_cursor_pos -= 1;
+                        }
+                    }
+                    KeyCode::Delete => {
+                        if self.git_popup_state.worktree_cursor_pos < self.git_popup_state.worktree_path.len() {
+                            self.git_popup_state.worktree_path.remove(self.git_popup_state.worktree_cursor_pos);
+                        }
+                    }
+                    KeyCode::Char(c) => {
+                        self.git_popup_state.worktree_path.insert(self.git_popup_state.worktree_cursor_pos, c);
+                        self.git_popup_state.worktree_cursor_pos += 1;
                     }
                     _ => {}
                 }
@@ -538,6 +630,9 @@ impl App {
                             selected_option: GitBranchOption::CreateBranch,
                             story_id: 0,
                             editing_branch_name: false,
+                            editing_worktree_path: false,
+                            branch_cursor_pos: 0,
+                            worktree_cursor_pos: 0,
                         };
                     }
                     KeyCode::Enter => {
@@ -555,17 +650,20 @@ impl App {
                         // Enter branch name editing mode
                         self.git_popup_state.editing_branch_name = true;
                     }
+                    KeyCode::Char('w') => {
+                        // Enter worktree path editing mode (only for bare repos)
+                        if self.git_context.is_bare_repo() {
+                            self.git_popup_state.editing_worktree_path = true;
+                        }
+                    }
                     KeyCode::Up | KeyCode::Char('k') => {
                     match self.git_popup_state.selected_option {
                         GitBranchOption::CreateBranch => {
                             self.git_popup_state.selected_option = GitBranchOption::Cancel;
                         }
                         GitBranchOption::CreateWorktree => {
-                            if self.git_context.is_bare_repo() {
-                                self.git_popup_state.selected_option = GitBranchOption::Cancel;
-                            } else {
-                                self.git_popup_state.selected_option = GitBranchOption::CreateBranch;
-                            }
+                            // CreateWorktree is only available in bare repos, so always go to Cancel
+                            self.git_popup_state.selected_option = GitBranchOption::Cancel;
                         }
                         GitBranchOption::Cancel => {
                             if self.git_context.is_bare_repo() {
@@ -580,9 +678,9 @@ impl App {
                     match self.git_popup_state.selected_option {
                         GitBranchOption::CreateBranch => {
                             if self.git_context.is_bare_repo() {
-                                self.git_popup_state.selected_option = GitBranchOption::Cancel;
-                            } else {
                                 self.git_popup_state.selected_option = GitBranchOption::CreateWorktree;
+                            } else {
+                                self.git_popup_state.selected_option = GitBranchOption::Cancel;
                             }
                         }
                         GitBranchOption::CreateWorktree => {
@@ -819,6 +917,9 @@ impl App {
                                 },
                                 story_id: story.id,
                                 editing_branch_name: false,
+                                editing_worktree_path: false,
+                                branch_cursor_pos: suggested_branch.len(),
+                                worktree_cursor_pos: crate::git::generate_worktree_path(&suggested_branch).len(),
                             };
                         }
                     }
@@ -1426,7 +1527,16 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         .border_style(branch_border_style);
     
     let branch_content = if app.git_popup_state.editing_branch_name {
-        format!("{}_", app.git_popup_state.branch_name) // Show cursor
+        // Insert block cursor at the correct position
+        let mut content = app.git_popup_state.branch_name.clone();
+        if app.git_popup_state.branch_cursor_pos < content.len() {
+            // Replace character at cursor position with block cursor
+            content.replace_range(app.git_popup_state.branch_cursor_pos..app.git_popup_state.branch_cursor_pos + 1, "█");
+        } else {
+            // Append block cursor at the end
+            content.push('█');
+        }
+        content
     } else {
         app.git_popup_state.branch_name.clone()
     };
@@ -1437,11 +1547,37 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
     
     // Worktree path field (only for bare repos)
     if app.git_context.is_bare_repo() {
+        let worktree_title = if app.git_popup_state.editing_worktree_path {
+            "Worktree Path (editing...)"
+        } else {
+            "Worktree Path [w to edit]"
+        };
+        let worktree_border_style = if app.git_popup_state.editing_worktree_path {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::Blue)
+        };
         let worktree_block = Block::default()
-            .title("Worktree Path")
+            .title(worktree_title)
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Blue));
-        let worktree_text = Paragraph::new(app.git_popup_state.worktree_path.as_str())
+            .border_style(worktree_border_style);
+        
+        let worktree_content = if app.git_popup_state.editing_worktree_path {
+            // Insert block cursor at the correct position
+            let mut content = app.git_popup_state.worktree_path.clone();
+            if app.git_popup_state.worktree_cursor_pos < content.len() {
+                // Replace character at cursor position with block cursor
+                content.replace_range(app.git_popup_state.worktree_cursor_pos..app.git_popup_state.worktree_cursor_pos + 1, "█");
+            } else {
+                // Append block cursor at the end
+                content.push('█');
+            }
+            content
+        } else {
+            app.git_popup_state.worktree_path.clone()
+        };
+        
+        let worktree_text = Paragraph::new(worktree_content)
             .block(worktree_block);
         frame.render_widget(worktree_text, chunks[1]);
     }
@@ -1486,11 +1622,18 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
     let repo_type = if app.git_context.is_bare_repo() { "bare" } else { "normal" };
     let current_branch = app.git_context.current_branch.as_deref().unwrap_or("unknown");
     let help_text = if app.git_popup_state.editing_branch_name {
-        "Editing branch name | [Enter] save | [Esc] cancel edit | [Backspace] delete | Type to edit".to_string()
+        "Editing branch name | [Enter] save | [Esc] cancel | [←/→] move cursor | [Home/End] | [Ctrl+A/Ctrl+E] | [Backspace/Del] | Type to edit".to_string()
+    } else if app.git_popup_state.editing_worktree_path {
+        "Editing worktree path | [Enter] save | [Esc] cancel | [←/→] move cursor | [Home/End] | [Ctrl+A/Ctrl+E] | [Backspace/Del] | Type to edit".to_string()
     } else {
-        format!(
+        let base_help = format!(
             "Git repo: {repo_type} | Current branch: {current_branch} | [↑/↓] select | [Tab/e] edit name | [Enter] confirm | [Esc] cancel"
-        )
+        );
+        if app.git_context.is_bare_repo() {
+            format!("{base_help} | [w] edit worktree path")
+        } else {
+            base_help
+        }
     };
     
     let help = Paragraph::new(help_text)

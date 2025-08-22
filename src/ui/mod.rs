@@ -92,6 +92,8 @@ pub struct App {
     pub show_git_popup: bool, // Flag to show git branch creation popup
     pub git_popup_state: GitBranchPopupState, // Git popup state
     pub git_branch_requested: bool, // Flag to request git branch creation
+    pub show_git_result_popup: bool, // Flag to show git operation result popup
+    pub git_result_state: GitResultState, // Git result popup state
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +146,29 @@ pub enum GitBranchOption {
     CreateBranch,
     CreateWorktree,
     Cancel,
+}
+
+#[derive(Debug, Clone)]
+pub struct GitResultState {
+    pub success: bool,
+    pub operation_type: GitOperationType,
+    pub message: String,
+    pub branch_name: String,
+    pub worktree_path: Option<String>,
+    pub story_id: i64,
+    pub selected_option: GitResultOption,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GitOperationType {
+    CreateBranch,
+    CreateWorktree,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GitResultOption {
+    Continue,
+    ExitAndChange, // Only for successful worktree creation
 }
 
 impl Default for CreatePopupState {
@@ -313,6 +338,16 @@ impl App {
                 worktree_cursor_pos: 0,
             },
             git_branch_requested: false,
+            show_git_result_popup: false,
+            git_result_state: GitResultState {
+                success: false,
+                operation_type: GitOperationType::CreateBranch,
+                message: String::new(),
+                branch_name: String::new(),
+                worktree_path: None,
+                story_id: 0,
+                selected_option: GitResultOption::Continue,
+            },
         }
     }
 
@@ -508,7 +543,45 @@ impl App {
     }
 
     pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
-        if self.show_git_popup {
+        if self.show_git_result_popup {
+            // Handle git result popup input
+            match key.code {
+                KeyCode::Esc | KeyCode::Enter => {
+                    if self.git_result_state.selected_option == GitResultOption::Continue || key.code == KeyCode::Esc {
+                        // Just close the popup
+                        self.show_git_result_popup = false;
+                    } else if self.git_result_state.selected_option == GitResultOption::ExitAndChange {
+                        // Exit and change to worktree directory
+                        if let Some(ref worktree_path) = self.git_result_state.worktree_path {
+                            // Set flag to exit the application and change directory
+                            unsafe {
+                                std::env::set_var("SC_CLI_EXIT_AND_CD", worktree_path);
+                            }
+                        }
+                        self.should_quit = true;
+                    }
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if self.git_result_state.worktree_path.is_some() && self.git_result_state.success {
+                        // Toggle between Continue and ExitAndChange
+                        self.git_result_state.selected_option = match self.git_result_state.selected_option {
+                            GitResultOption::Continue => GitResultOption::ExitAndChange,
+                            GitResultOption::ExitAndChange => GitResultOption::Continue,
+                        };
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if self.git_result_state.worktree_path.is_some() && self.git_result_state.success {
+                        // Toggle between Continue and ExitAndChange
+                        self.git_result_state.selected_option = match self.git_result_state.selected_option {
+                            GitResultOption::Continue => GitResultOption::ExitAndChange,
+                            GitResultOption::ExitAndChange => GitResultOption::Continue,
+                        };
+                    }
+                }
+                _ => {}
+            }
+        } else if self.show_git_popup {
             // Handle git popup input
             if self.git_popup_state.editing_branch_name {
                 // Handle branch name editing
@@ -1114,6 +1187,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.show_git_popup {
         draw_git_popup(frame, app);
     }
+    
+    if app.show_git_result_popup {
+        draw_git_result_popup(frame, app);
+    }
 }
 
 fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
@@ -1641,6 +1718,93 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         .alignment(Alignment::Center)
         .wrap(Wrap { trim: true });
     frame.render_widget(help, chunks[3]);
+}
+
+fn draw_git_result_popup(frame: &mut Frame, app: &App) {
+    let area = centered_rect(60, 40, frame.area());
+    frame.render_widget(Clear, area);
+
+    // Main popup block
+    let title = if app.git_result_state.success {
+        "✅ Git Operation Successful"
+    } else {
+        "❌ Git Operation Failed"
+    };
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(if app.git_result_state.success {
+            Style::default().fg(Color::Green)
+        } else {
+            Style::default().fg(Color::Red)
+        });
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    // Create layout
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3), // Message
+            Constraint::Min(3),    // Options (if available)
+            Constraint::Length(2), // Help text
+        ])
+        .split(inner);
+
+    // Message
+    let message_block = Block::default()
+        .title("Result")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Blue));
+    
+    let message_text = Paragraph::new(app.git_result_state.message.as_str())
+        .block(message_block)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(message_text, chunks[0]);
+
+    // Options (only for successful worktree creation)
+    if app.git_result_state.success && app.git_result_state.worktree_path.is_some() {
+        let options_block = Block::default()
+            .title("Options")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow));
+
+        let continue_style = if app.git_result_state.selected_option == GitResultOption::Continue {
+            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        let exit_style = if app.git_result_state.selected_option == GitResultOption::ExitAndChange {
+            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        let options = vec![
+            ListItem::new("Continue working in current session").style(continue_style),
+            ListItem::new(format!("Exit and change to worktree directory: {}", 
+                app.git_result_state.worktree_path.as_deref().unwrap_or(""))).style(exit_style),
+        ];
+
+        let list = List::new(options).block(options_block);
+        frame.render_widget(list, chunks[1]);
+    }
+
+    // Help text
+    let help_text = if app.git_result_state.success && app.git_result_state.worktree_path.is_some() {
+        "[↑/↓] select option | [Enter] confirm | [Esc] continue"
+    } else {
+        "[Enter] or [Esc] continue"
+    };
+
+    let help = Paragraph::new(help_text)
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(help, chunks[2]);
 }
 
 fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {

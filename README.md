@@ -119,6 +119,9 @@ user_id = "your.work.mention.name"
 - **Space** - Move story to a different workflow state
 - **o** - Take ownership of the selected story
 - **a** - Add a new story
+- **e** - Edit the selected story
+- **g** - Create git branch for the selected story (in git repositories)
+- **v** - Toggle between column and list view modes
 - **n** - Load more stories (fetch next page)
 - **Esc** - Close detail view or cancel state selection
 - **q** - Quit the application
@@ -154,6 +157,19 @@ When you press **a** in the TUI:
 - Press **Esc** at any time to cancel
 - The story is created with you as the requester
 - The new story appears in the first workflow state (typically "Backlog" or "To Do")
+
+#### Editing Stories in TUI
+
+When you press **e** on a selected story:
+- A popup form appears for editing the story
+- Navigate between fields using **Tab**
+- Edit the following fields:
+  - **Name**: The story title
+  - **Description**: Detailed story description
+  - **Type**: Use **↑/↓** to select between feature, bug, or chore
+- Press **Enter** on the Type field to save changes
+- Press **Esc** at any time to cancel without saving
+- Changes are immediately updated in Shortcut and reflected in the UI
 
 #### Loading More Stories (Pagination)
 
@@ -218,6 +234,33 @@ sc-cli add --token YOUR_API_TOKEN
 sc-cli add "Add user profile feature" --type feature -w work
 ```
 
+#### Editing Stories
+
+```bash
+# Edit a story by ID
+sc-cli edit 42 --workspace work
+
+# Edit with prefixed story ID
+sc-cli edit sc-42 -w work
+
+# Using direct token instead of workspace
+sc-cli edit 42 --token YOUR_API_TOKEN
+```
+
+#### Finishing Stories
+
+```bash
+# Mark a story as finished (move to Done state)
+sc-cli finish 42 --workspace work
+
+# With prefixed story ID
+sc-cli finish sc-42 -w work
+
+# Using direct token
+sc-cli finish 42 --token YOUR_API_TOKEN
+```
+
+
 ### Command-line Options
 
 #### Global Options
@@ -243,6 +286,17 @@ Note: The `--all`, `--owner`, and `--requester` flags are mutually exclusive. On
   - Will prompt if not provided
 - `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
 - `--type` (optional) - Story type: feature, bug, or chore (will prompt if not provided)
+
+#### Edit Command
+- `story_id` - Story ID to edit (e.g., 42 or sc-42)
+- `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
+
+#### Finish Command
+- `story_id` - Story ID to mark as finished (e.g., 42 or sc-42)
+- `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
+
+#### Show Command
+- Same options as View command but displays stories in paginated terminal output instead of TUI
 
 ### Search Syntax
 
@@ -290,58 +344,34 @@ The application handles:
 
 Make sure your API token has the necessary permissions to read stories and workflows.
 
-## Development
+## Additional Commands
 
-### Project Structure
-
-```
-sc-cli/
-├── .gitignore           # Git ignore patterns
-├── .tool-versions       # asdf version management
-├── CLAUDE.md            # AI assistant guidance
-├── Cargo.toml           # Rust project manifest
-├── Cargo.lock           # Rust dependency lock file
-├── README.md            # This file
-├── src/                 # Rust source code
-│   ├── main.rs          # Application entry point
-│   ├── api/             # Shortcut API client
-│   │   ├── mod.rs       # API types and traits
-│   │   └── client.rs    # API client implementation
-│   └── ui/              # TUI components
-│       └── mod.rs       # UI implementation
-└── target/              # Rust build artifacts (git ignored)
-```
-
-### Building and Running
+The application also includes additional commands for enhanced workflow:
 
 ```bash
-# Development build
-cargo build
+# Mark a story as finished
+sc-cli finish 42  # or sc-42
 
-# Release build (optimized)
-cargo build --release
+# Edit an existing story
+sc-cli edit 42
 
-# Run with cargo (for development)
-cargo run -- <username> --token <token>
-
-# Or run the installed binary
-sc-cli <username> --token <token>
-
-# Run tests
-cargo test
-
-# Check code
-cargo check
-cargo clippy
+# Show stories in paginated terminal output
+sc-cli show --limit 10
 ```
 
-### Contributing
+## Git Integration
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run `cargo clippy` and `cargo test`
-5. Submit a pull request
+When working in a git repository, the TUI provides additional functionality:
+
+- **Press 'g' on any story** to create a git branch
+- **Branch names** are suggested using Shortcut's formatted VCS branch names
+- **Edit branch names** before creation using Tab or 'e' key
+- **Supports both normal and bare repositories** (uses git worktree for bare repos)
+- **Automatic branch naming** follows Shortcut conventions
+
+## Development
+
+For development information, build instructions, contributing guidelines, and technical details, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 

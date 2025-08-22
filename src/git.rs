@@ -120,7 +120,7 @@ pub fn create_worktree(branch_name: &str, worktree_path: &str) -> Result<()> {
 /// Check if a branch already exists
 pub fn branch_exists(branch_name: &str) -> Result<bool> {
     let output = Command::new("git")
-        .args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{}", branch_name)])
+        .args(["show-ref", "--verify", "--quiet", &format!("refs/heads/{branch_name}")])
         .output()
         .context("Failed to check if branch exists")?;
     
@@ -131,11 +131,9 @@ pub fn branch_exists(branch_name: &str) -> Result<bool> {
 pub fn generate_worktree_path(branch_name: &str) -> String {
     // Replace slashes and other problematic characters with dashes
     let safe_name = branch_name
-        .replace('/', "-")
-        .replace('\\', "-")
-        .replace(' ', "-");
+        .replace(['/', '\\', ' '], "-");
     
-    format!("../{}", safe_name)
+    format!("../{safe_name}")
 }
 
 #[cfg(test)]

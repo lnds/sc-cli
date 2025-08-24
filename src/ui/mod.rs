@@ -9,7 +9,33 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
     Frame,
 };
+use tui_textarea::TextArea;
 use std::collections::HashMap;
+
+fn convert_key_to_ratatui(key: crossterm::event::KeyEvent) -> ratatui::crossterm::event::KeyEvent {
+    let ratatui_code = match key.code {
+        KeyCode::Backspace => ratatui::crossterm::event::KeyCode::Backspace,
+        KeyCode::Enter => ratatui::crossterm::event::KeyCode::Enter,
+        KeyCode::Left => ratatui::crossterm::event::KeyCode::Left,
+        KeyCode::Right => ratatui::crossterm::event::KeyCode::Right,
+        KeyCode::Up => ratatui::crossterm::event::KeyCode::Up,
+        KeyCode::Down => ratatui::crossterm::event::KeyCode::Down,
+        KeyCode::Home => ratatui::crossterm::event::KeyCode::Home,
+        KeyCode::End => ratatui::crossterm::event::KeyCode::End,
+        KeyCode::PageUp => ratatui::crossterm::event::KeyCode::PageUp,
+        KeyCode::PageDown => ratatui::crossterm::event::KeyCode::PageDown,
+        KeyCode::Tab => ratatui::crossterm::event::KeyCode::Tab,
+        KeyCode::BackTab => ratatui::crossterm::event::KeyCode::BackTab,
+        KeyCode::Delete => ratatui::crossterm::event::KeyCode::Delete,
+        KeyCode::Insert => ratatui::crossterm::event::KeyCode::Insert,
+        KeyCode::Esc => ratatui::crossterm::event::KeyCode::Esc,
+        KeyCode::Char(c) => ratatui::crossterm::event::KeyCode::Char(c),
+        KeyCode::F(n) => ratatui::crossterm::event::KeyCode::F(n),
+        _ => ratatui::crossterm::event::KeyCode::Null,
+    };
+    
+    ratatui::crossterm::event::KeyEvent::from(ratatui_code)
+}
 
 #[cfg(test)]
 mod tests;
@@ -96,10 +122,10 @@ pub struct App {
     pub git_result_state: GitResultState, // Git result popup state
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CreatePopupState {
-    pub name: String,
-    pub description: String,
+    pub name_textarea: TextArea<'static>,
+    pub description_textarea: TextArea<'static>,
     pub story_type: String,
     pub selected_field: CreateField,
     pub story_type_index: usize,
@@ -112,10 +138,10 @@ pub enum CreateField {
     Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct EditPopupState {
-    pub name: String,
-    pub description: String,
+    pub name_textarea: TextArea<'static>,
+    pub description_textarea: TextArea<'static>,
     pub story_type: String,
     pub selected_field: EditField,
     pub story_type_index: usize,
@@ -129,16 +155,14 @@ pub enum EditField {
     Type,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GitBranchPopupState {
-    pub branch_name: String,
-    pub worktree_path: String,
+    pub branch_name_textarea: TextArea<'static>,
+    pub worktree_path_textarea: TextArea<'static>,
     pub selected_option: GitBranchOption,
     pub story_id: i64,
     pub editing_branch_name: bool,
     pub editing_worktree_path: bool,
-    pub branch_cursor_pos: usize,
-    pub worktree_cursor_pos: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -176,9 +200,25 @@ pub enum GitResultOption {
 
 impl Default for CreatePopupState {
     fn default() -> Self {
+        let mut name_textarea = TextArea::default();
+        name_textarea.set_cursor_line_style(Style::default());
+        name_textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Name"),
+        );
+        
+        let mut description_textarea = TextArea::default();
+        description_textarea.set_cursor_line_style(Style::default());
+        description_textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Description"),
+        );
+        
         Self {
-            name: String::new(),
-            description: String::new(),
+            name_textarea,
+            description_textarea,
             story_type: "feature".to_string(),
             selected_field: CreateField::Name,
             story_type_index: 0,
@@ -195,9 +235,27 @@ impl EditPopupState {
             _ => 0,
         };
         
+        let mut name_textarea = TextArea::default();
+        name_textarea.set_cursor_line_style(Style::default());
+        name_textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Name"),
+        );
+        name_textarea.insert_str(&story.name);
+        
+        let mut description_textarea = TextArea::default();
+        description_textarea.set_cursor_line_style(Style::default());
+        description_textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Description"),
+        );
+        description_textarea.insert_str(&story.description);
+        
         Self {
-            name: story.name.clone(),
-            description: story.description.clone(),
+            name_textarea,
+            description_textarea,
             story_type: story.story_type.clone(),
             selected_field: EditField::Name,
             story_type_index,
@@ -302,8 +360,18 @@ impl App {
             edit_story_requested: false,
             show_edit_popup: false,
             edit_popup_state: EditPopupState {
-                name: String::new(),
-                description: String::new(),
+                name_textarea: {
+                    let mut textarea = TextArea::default();
+                    textarea.set_cursor_line_style(Style::default());
+                    textarea.set_block(Block::default().borders(Borders::ALL).title("Name"));
+                    textarea
+                },
+                description_textarea: {
+                    let mut textarea = TextArea::default();
+                    textarea.set_cursor_line_style(Style::default());
+                    textarea.set_block(Block::default().borders(Borders::ALL).title("Description"));
+                    textarea
+                },
                 story_type: "feature".to_string(),
                 selected_field: EditField::Name,
                 story_type_index: 0,
@@ -331,14 +399,22 @@ impl App {
             git_context,
             show_git_popup: false,
             git_popup_state: GitBranchPopupState {
-                branch_name: String::new(),
-                worktree_path: String::new(),
+                branch_name_textarea: {
+                    let mut textarea = TextArea::default();
+                    textarea.set_cursor_line_style(Style::default());
+                    textarea.set_block(Block::default().borders(Borders::ALL).title("Branch Name"));
+                    textarea
+                },
+                worktree_path_textarea: {
+                    let mut textarea = TextArea::default();
+                    textarea.set_cursor_line_style(Style::default());
+                    textarea.set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
+                    textarea
+                },
                 selected_option: GitBranchOption::CreateBranch,
                 story_id: 0,
                 editing_branch_name: false,
                 editing_worktree_path: false,
-                branch_cursor_pos: 0,
-                worktree_cursor_pos: 0,
             },
             git_branch_requested: false,
             show_git_result_popup: false,
@@ -587,7 +663,7 @@ impl App {
         } else if self.show_git_popup {
             // Handle git popup input
             if self.git_popup_state.editing_branch_name {
-                // Handle branch name editing
+                // Handle branch name editing with TextArea
                 match key.code {
                     KeyCode::Esc => {
                         self.git_popup_state.editing_branch_name = false;
@@ -595,58 +671,17 @@ impl App {
                     KeyCode::Enter => {
                         self.git_popup_state.editing_branch_name = false;
                         // Update worktree path when branch name changes
-                        self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
-                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
+                        let branch_name = self.git_popup_state.branch_name_textarea.lines().join("");
+                        let worktree_path = crate::git::generate_worktree_path(&branch_name);
+                        self.git_popup_state.worktree_path_textarea.delete_line_by_head();
+                        self.git_popup_state.worktree_path_textarea.insert_str(&worktree_path);
                     }
-                    KeyCode::Left => {
-                        if self.git_popup_state.branch_cursor_pos > 0 {
-                            self.git_popup_state.branch_cursor_pos -= 1;
-                        }
+                    _ => {
+                        self.git_popup_state.branch_name_textarea.input(convert_key_to_ratatui(key));
                     }
-                    KeyCode::Right => {
-                        if self.git_popup_state.branch_cursor_pos < self.git_popup_state.branch_name.len() {
-                            self.git_popup_state.branch_cursor_pos += 1;
-                        }
-                    }
-                    KeyCode::Home => {
-                        self.git_popup_state.branch_cursor_pos = 0;
-                    }
-                    KeyCode::End => {
-                        self.git_popup_state.branch_cursor_pos = self.git_popup_state.branch_name.len();
-                    }
-                    KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        // Ctrl+A: Go to beginning of line
-                        self.git_popup_state.branch_cursor_pos = 0;
-                    }
-                    KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        // Ctrl+E: Go to end of line
-                        self.git_popup_state.branch_cursor_pos = self.git_popup_state.branch_name.len();
-                    }
-                    KeyCode::Backspace => {
-                        if self.git_popup_state.branch_cursor_pos > 0 {
-                            self.git_popup_state.branch_name.remove(self.git_popup_state.branch_cursor_pos - 1);
-                            self.git_popup_state.branch_cursor_pos -= 1;
-                            self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
-                            self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
-                        }
-                    }
-                    KeyCode::Delete => {
-                        if self.git_popup_state.branch_cursor_pos < self.git_popup_state.branch_name.len() {
-                            self.git_popup_state.branch_name.remove(self.git_popup_state.branch_cursor_pos);
-                            self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
-                            self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
-                        }
-                    }
-                    KeyCode::Char(c) => {
-                        self.git_popup_state.branch_name.insert(self.git_popup_state.branch_cursor_pos, c);
-                        self.git_popup_state.branch_cursor_pos += 1;
-                        self.git_popup_state.worktree_path = crate::git::generate_worktree_path(&self.git_popup_state.branch_name);
-                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
-                    }
-                    _ => {}
                 }
             } else if self.git_popup_state.editing_worktree_path {
-                // Handle worktree path editing
+                // Handle worktree path editing with TextArea
                 match key.code {
                     KeyCode::Esc => {
                         self.git_popup_state.editing_worktree_path = false;
@@ -654,46 +689,9 @@ impl App {
                     KeyCode::Enter => {
                         self.git_popup_state.editing_worktree_path = false;
                     }
-                    KeyCode::Left => {
-                        if self.git_popup_state.worktree_cursor_pos > 0 {
-                            self.git_popup_state.worktree_cursor_pos -= 1;
-                        }
+                    _ => {
+                        self.git_popup_state.worktree_path_textarea.input(convert_key_to_ratatui(key));
                     }
-                    KeyCode::Right => {
-                        if self.git_popup_state.worktree_cursor_pos < self.git_popup_state.worktree_path.len() {
-                            self.git_popup_state.worktree_cursor_pos += 1;
-                        }
-                    }
-                    KeyCode::Home => {
-                        self.git_popup_state.worktree_cursor_pos = 0;
-                    }
-                    KeyCode::End => {
-                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
-                    }
-                    KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        // Ctrl+A: Go to beginning of line
-                        self.git_popup_state.worktree_cursor_pos = 0;
-                    }
-                    KeyCode::Char('e') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                        // Ctrl+E: Go to end of line
-                        self.git_popup_state.worktree_cursor_pos = self.git_popup_state.worktree_path.len();
-                    }
-                    KeyCode::Backspace => {
-                        if self.git_popup_state.worktree_cursor_pos > 0 {
-                            self.git_popup_state.worktree_path.remove(self.git_popup_state.worktree_cursor_pos - 1);
-                            self.git_popup_state.worktree_cursor_pos -= 1;
-                        }
-                    }
-                    KeyCode::Delete => {
-                        if self.git_popup_state.worktree_cursor_pos < self.git_popup_state.worktree_path.len() {
-                            self.git_popup_state.worktree_path.remove(self.git_popup_state.worktree_cursor_pos);
-                        }
-                    }
-                    KeyCode::Char(c) => {
-                        self.git_popup_state.worktree_path.insert(self.git_popup_state.worktree_cursor_pos, c);
-                        self.git_popup_state.worktree_cursor_pos += 1;
-                    }
-                    _ => {}
                 }
             } else {
                 // Handle normal git popup navigation
@@ -701,14 +699,22 @@ impl App {
                     KeyCode::Esc => {
                         self.show_git_popup = false;
                         self.git_popup_state = GitBranchPopupState {
-                            branch_name: String::new(),
-                            worktree_path: String::new(),
+                            branch_name_textarea: {
+                                let mut textarea = TextArea::default();
+                                textarea.set_cursor_line_style(Style::default());
+                                textarea.set_block(Block::default().borders(Borders::ALL).title("Branch Name"));
+                                textarea
+                            },
+                            worktree_path_textarea: {
+                                let mut textarea = TextArea::default();
+                                textarea.set_cursor_line_style(Style::default());
+                                textarea.set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
+                                textarea
+                            },
                             selected_option: GitBranchOption::CreateBranch,
                             story_id: 0,
                             editing_branch_name: false,
                             editing_worktree_path: false,
-                            branch_cursor_pos: 0,
-                            worktree_cursor_pos: 0,
                         };
                     }
                     KeyCode::Enter => {
@@ -780,8 +786,18 @@ impl App {
                 KeyCode::Esc => {
                     self.show_edit_popup = false;
                     self.edit_popup_state = EditPopupState {
-                        name: String::new(),
-                        description: String::new(),
+                        name_textarea: {
+                            let mut textarea = TextArea::default();
+                            textarea.set_cursor_line_style(Style::default());
+                            textarea.set_block(Block::default().borders(Borders::ALL).title("Name"));
+                            textarea
+                        },
+                        description_textarea: {
+                            let mut textarea = TextArea::default();
+                            textarea.set_cursor_line_style(Style::default());
+                            textarea.set_block(Block::default().borders(Borders::ALL).title("Description"));
+                            textarea
+                        },
                         story_type: "feature".to_string(),
                         selected_field: EditField::Name,
                         story_type_index: 0,
@@ -799,7 +815,7 @@ impl App {
                 KeyCode::Enter => {
                     if self.edit_popup_state.selected_field == EditField::Type {
                         // Submit the story edit
-                        if !self.edit_popup_state.name.is_empty() {
+                        if !self.edit_popup_state.name_textarea.lines().join("").trim().is_empty() {
                             self.edit_story_requested = true;
                             self.show_edit_popup = false;
                         }
@@ -810,20 +826,6 @@ impl App {
                             EditField::Description => EditField::Type,
                             EditField::Type => EditField::Type,
                         };
-                    }
-                }
-                KeyCode::Backspace => {
-                    match self.edit_popup_state.selected_field {
-                        EditField::Name => { self.edit_popup_state.name.pop(); }
-                        EditField::Description => { self.edit_popup_state.description.pop(); }
-                        EditField::Type => {}
-                    }
-                }
-                KeyCode::Char(c) => {
-                    match self.edit_popup_state.selected_field {
-                        EditField::Name => self.edit_popup_state.name.push(c),
-                        EditField::Description => self.edit_popup_state.description.push(c),
-                        EditField::Type => {}
                     }
                 }
                 KeyCode::Up | KeyCode::Down if self.edit_popup_state.selected_field == EditField::Type => {
@@ -842,7 +844,18 @@ impl App {
                     }
                     self.edit_popup_state.story_type = types[self.edit_popup_state.story_type_index].to_string();
                 }
-                _ => {}
+                _ => {
+                    // Handle text input for TextArea widgets
+                    match self.edit_popup_state.selected_field {
+                        EditField::Name => {
+                            self.edit_popup_state.name_textarea.input(convert_key_to_ratatui(key));
+                        }
+                        EditField::Description => {
+                            self.edit_popup_state.description_textarea.input(convert_key_to_ratatui(key));
+                        }
+                        EditField::Type => {}
+                    }
+                }
             }
         } else if self.show_create_popup {
             // Handle create popup input
@@ -862,7 +875,7 @@ impl App {
                 KeyCode::Enter => {
                     if self.create_popup_state.selected_field == CreateField::Type {
                         // Submit the story
-                        if !self.create_popup_state.name.is_empty() {
+                        if !self.create_popup_state.name_textarea.lines().join("").trim().is_empty() {
                             self.create_story_requested = true;
                             self.show_create_popup = false;
                         }
@@ -873,20 +886,6 @@ impl App {
                             CreateField::Description => CreateField::Type,
                             CreateField::Type => CreateField::Type,
                         };
-                    }
-                }
-                KeyCode::Backspace => {
-                    match self.create_popup_state.selected_field {
-                        CreateField::Name => { self.create_popup_state.name.pop(); }
-                        CreateField::Description => { self.create_popup_state.description.pop(); }
-                        CreateField::Type => {}
-                    }
-                }
-                KeyCode::Char(c) => {
-                    match self.create_popup_state.selected_field {
-                        CreateField::Name => self.create_popup_state.name.push(c),
-                        CreateField::Description => self.create_popup_state.description.push(c),
-                        CreateField::Type => {}
                     }
                 }
                 KeyCode::Up | KeyCode::Down if self.create_popup_state.selected_field == CreateField::Type => {
@@ -905,7 +904,18 @@ impl App {
                     }
                     self.create_popup_state.story_type = types[self.create_popup_state.story_type_index].to_string();
                 }
-                _ => {}
+                _ => {
+                    // Handle text input for TextArea widgets
+                    match self.create_popup_state.selected_field {
+                        CreateField::Name => {
+                            self.create_popup_state.name_textarea.input(convert_key_to_ratatui(key));
+                        }
+                        CreateField::Description => {
+                            self.create_popup_state.description_textarea.input(convert_key_to_ratatui(key));
+                        }
+                        CreateField::Type => {}
+                    }
+                }
             }
         } else if self.show_state_selector {
             // Handle state selector navigation
@@ -984,8 +994,20 @@ impl App {
                             });
                             self.show_git_popup = true;
                             self.git_popup_state = GitBranchPopupState {
-                                branch_name: suggested_branch.clone(),
-                                worktree_path: crate::git::generate_worktree_path(&suggested_branch),
+                                branch_name_textarea: {
+                                    let mut textarea = TextArea::default();
+                                    textarea.set_cursor_line_style(Style::default());
+                                    textarea.set_block(Block::default().borders(Borders::ALL).title("Branch Name"));
+                                    textarea.insert_str(&suggested_branch);
+                                    textarea
+                                },
+                                worktree_path_textarea: {
+                                    let mut textarea = TextArea::default();
+                                    textarea.set_cursor_line_style(Style::default());
+                                    textarea.set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
+                                    textarea.insert_str(&crate::git::generate_worktree_path(&suggested_branch));
+                                    textarea
+                                },
                                 selected_option: if self.git_context.is_bare_repo() { 
                                     GitBranchOption::CreateWorktree 
                                 } else { 
@@ -994,8 +1016,6 @@ impl App {
                                 story_id: story.id,
                                 editing_branch_name: false,
                                 editing_worktree_path: false,
-                                branch_cursor_pos: suggested_branch.len(),
-                                worktree_cursor_pos: crate::git::generate_worktree_path(&suggested_branch).len(),
                             };
                         }
                     }
@@ -1395,36 +1415,45 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
         ])
         .split(inner);
     
-    // Name field
-    let name_style = if app.create_popup_state.selected_field == CreateField::Name {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    // Name field - render TextArea widget
+    let mut name_textarea = app.create_popup_state.name_textarea.clone();
+    if app.create_popup_state.selected_field == CreateField::Name {
+        name_textarea.set_block(
+            Block::default()
+                .title("Name")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        );
+        name_textarea.set_cursor_line_style(Style::default());
     } else {
-        Style::default().fg(Color::White)
-    };
+        name_textarea.set_block(
+            Block::default()
+                .title("Name")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White))
+        );
+    }
+    frame.render_widget(&name_textarea, chunks[0]);
     
-    let name_block = Block::default()
-        .title("Name")
-        .borders(Borders::ALL)
-        .border_style(name_style);
-    let name_text = Paragraph::new(app.create_popup_state.name.as_str())
-        .block(name_block);
-    frame.render_widget(name_text, chunks[0]);
-    
-    // Description field
-    let desc_style = if app.create_popup_state.selected_field == CreateField::Description {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    // Description field - render TextArea widget
+    let mut desc_textarea = app.create_popup_state.description_textarea.clone();
+    if app.create_popup_state.selected_field == CreateField::Description {
+        desc_textarea.set_block(
+            Block::default()
+                .title("Description")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        );
+        desc_textarea.set_cursor_line_style(Style::default());
     } else {
-        Style::default().fg(Color::White)
-    };
-    
-    let desc_block = Block::default()
-        .title("Description")
-        .borders(Borders::ALL)
-        .border_style(desc_style);
-    let desc_text = Paragraph::new(app.create_popup_state.description.as_str())
-        .block(desc_block)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(desc_text, chunks[1]);
+        desc_textarea.set_block(
+            Block::default()
+                .title("Description")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White))
+        );
+    }
+    frame.render_widget(&desc_textarea, chunks[1]);
     
     // Type field
     let type_style = if app.create_popup_state.selected_field == CreateField::Type {
@@ -1493,36 +1522,45 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
         ])
         .split(inner);
     
-    // Name field
-    let name_style = if app.edit_popup_state.selected_field == EditField::Name {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    // Name field - render TextArea widget
+    let mut name_textarea = app.edit_popup_state.name_textarea.clone();
+    if app.edit_popup_state.selected_field == EditField::Name {
+        name_textarea.set_block(
+            Block::default()
+                .title("Name")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        );
+        name_textarea.set_cursor_line_style(Style::default());
     } else {
-        Style::default().fg(Color::White)
-    };
+        name_textarea.set_block(
+            Block::default()
+                .title("Name")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White))
+        );
+    }
+    frame.render_widget(&name_textarea, chunks[0]);
     
-    let name_block = Block::default()
-        .title("Name")
-        .borders(Borders::ALL)
-        .border_style(name_style);
-    let name_text = Paragraph::new(app.edit_popup_state.name.as_str())
-        .block(name_block);
-    frame.render_widget(name_text, chunks[0]);
-    
-    // Description field
-    let desc_style = if app.edit_popup_state.selected_field == EditField::Description {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+    // Description field - render TextArea widget
+    let mut desc_textarea = app.edit_popup_state.description_textarea.clone();
+    if app.edit_popup_state.selected_field == EditField::Description {
+        desc_textarea.set_block(
+            Block::default()
+                .title("Description")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        );
+        desc_textarea.set_cursor_line_style(Style::default());
     } else {
-        Style::default().fg(Color::White)
-    };
-    
-    let desc_block = Block::default()
-        .title("Description")
-        .borders(Borders::ALL)
-        .border_style(desc_style);
-    let desc_text = Paragraph::new(app.edit_popup_state.description.as_str())
-        .block(desc_block)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(desc_text, chunks[1]);
+        desc_textarea.set_block(
+            Block::default()
+                .title("Description")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::White))
+        );
+    }
+    frame.render_widget(&desc_textarea, chunks[1]);
     
     // Type field
     let type_style = if app.edit_popup_state.selected_field == EditField::Type {
@@ -1590,7 +1628,8 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         ])
         .split(inner);
     
-    // Branch name field
+    // Branch name field - render TextArea widget
+    let mut branch_textarea = app.git_popup_state.branch_name_textarea.clone();
     let branch_title = if app.git_popup_state.editing_branch_name {
         "Branch Name (editing...)"
     } else {
@@ -1601,32 +1640,20 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
     } else {
         Style::default().fg(Color::Yellow)
     };
-    let branch_block = Block::default()
-        .title(branch_title)
-        .borders(Borders::ALL)
-        .border_style(branch_border_style);
+    branch_textarea.set_block(
+        Block::default()
+            .title(branch_title)
+            .borders(Borders::ALL)
+            .border_style(branch_border_style)
+    );
+    if app.git_popup_state.editing_branch_name {
+        branch_textarea.set_cursor_line_style(Style::default());
+    }
+    frame.render_widget(&branch_textarea, chunks[0]);
     
-    let branch_content = if app.git_popup_state.editing_branch_name {
-        // Insert block cursor at the correct position
-        let mut content = app.git_popup_state.branch_name.clone();
-        if app.git_popup_state.branch_cursor_pos < content.len() {
-            // Replace character at cursor position with block cursor
-            content.replace_range(app.git_popup_state.branch_cursor_pos..app.git_popup_state.branch_cursor_pos + 1, "█");
-        } else {
-            // Append block cursor at the end
-            content.push('█');
-        }
-        content
-    } else {
-        app.git_popup_state.branch_name.clone()
-    };
-    
-    let branch_text = Paragraph::new(branch_content)
-        .block(branch_block);
-    frame.render_widget(branch_text, chunks[0]);
-    
-    // Worktree path field (only for bare repos)
+    // Worktree path field (only for bare repos) - render TextArea widget
     if app.git_context.is_bare_repo() {
+        let mut worktree_textarea = app.git_popup_state.worktree_path_textarea.clone();
         let worktree_title = if app.git_popup_state.editing_worktree_path {
             "Worktree Path (editing...)"
         } else {
@@ -1637,29 +1664,16 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         } else {
             Style::default().fg(Color::Blue)
         };
-        let worktree_block = Block::default()
-            .title(worktree_title)
-            .borders(Borders::ALL)
-            .border_style(worktree_border_style);
-        
-        let worktree_content = if app.git_popup_state.editing_worktree_path {
-            // Insert block cursor at the correct position
-            let mut content = app.git_popup_state.worktree_path.clone();
-            if app.git_popup_state.worktree_cursor_pos < content.len() {
-                // Replace character at cursor position with block cursor
-                content.replace_range(app.git_popup_state.worktree_cursor_pos..app.git_popup_state.worktree_cursor_pos + 1, "█");
-            } else {
-                // Append block cursor at the end
-                content.push('█');
-            }
-            content
-        } else {
-            app.git_popup_state.worktree_path.clone()
-        };
-        
-        let worktree_text = Paragraph::new(worktree_content)
-            .block(worktree_block);
-        frame.render_widget(worktree_text, chunks[1]);
+        worktree_textarea.set_block(
+            Block::default()
+                .title(worktree_title)
+                .borders(Borders::ALL)
+                .border_style(worktree_border_style)
+        );
+        if app.git_popup_state.editing_worktree_path {
+            worktree_textarea.set_cursor_line_style(Style::default());
+        }
+        frame.render_widget(&worktree_textarea, chunks[1]);
     }
     
     // Options

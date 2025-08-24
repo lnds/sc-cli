@@ -17,6 +17,7 @@ path = "src/lib.rs"
 [dependencies]
 # TUI framework
 ratatui = "0.29"
+tui-textarea = "0.7.0"
 crossterm = "0.29"
 
 # HTTP client

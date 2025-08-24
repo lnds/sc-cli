@@ -846,7 +846,7 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
         }
 
         // Check if we need to create a new story
-        if app.create_story_requested && !app.create_popup_state.name.is_empty() {
+        if app.create_story_requested && !app.create_popup_state.name_textarea.lines().join("").trim().is_empty() {
             // Get current member info to use as requester
             match client.get_current_member() {
                 Ok(current_member) => {
@@ -858,8 +858,8 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     
                     // Create the story using the popup data
                     let story_creator = StoryCreator::new(
-                        app.create_popup_state.name.clone(),
-                        app.create_popup_state.description.clone(),
+                        app.create_popup_state.name_textarea.lines().join(""),
+                        app.create_popup_state.description_textarea.lines().join(""),
                         app.create_popup_state.story_type.clone(),
                         current_member.id,
                         workflow_state_id,
@@ -894,10 +894,10 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
         }
 
         // Check if we need to edit a story
-        if app.edit_story_requested && !app.edit_popup_state.name.is_empty() {
+        if app.edit_story_requested && !app.edit_popup_state.name_textarea.lines().join("").trim().is_empty() {
             let story_id = app.edit_popup_state.story_id;
-            let name = app.edit_popup_state.name.clone();
-            let description = app.edit_popup_state.description.clone();
+            let name = app.edit_popup_state.name_textarea.lines().join("");
+            let description = app.edit_popup_state.description_textarea.lines().join("");
             let story_type = app.edit_popup_state.story_type.clone();
             
             match client.update_story_details(story_id, name, description, story_type) {
@@ -915,8 +915,18 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
             
             // Reset the edit state
             app.edit_popup_state = ui::EditPopupState {
-                name: String::new(),
-                description: String::new(),
+                name_textarea: {
+                    let mut textarea = tui_textarea::TextArea::default();
+                    textarea.set_cursor_line_style(ratatui::style::Style::default());
+                    textarea.set_block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::ALL).title("Name"));
+                    textarea
+                },
+                description_textarea: {
+                    let mut textarea = tui_textarea::TextArea::default();
+                    textarea.set_cursor_line_style(ratatui::style::Style::default());
+                    textarea.set_block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::ALL).title("Description"));
+                    textarea
+                },
                 story_type: "feature".to_string(),
                 selected_field: ui::EditField::Name,
                 story_type_index: 0,
@@ -927,8 +937,8 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
 
         // Check if we need to handle git branch creation
         if app.git_branch_requested {
-            let branch_name = app.git_popup_state.branch_name.clone();
-            let worktree_path = app.git_popup_state.worktree_path.clone();
+            let branch_name = app.git_popup_state.branch_name_textarea.lines().join("");
+            let worktree_path = app.git_popup_state.worktree_path_textarea.lines().join("");
             let selected_option = app.git_popup_state.selected_option.clone();
             let story_id = app.git_popup_state.story_id;
             
@@ -942,14 +952,22 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     // Reset git request state and return early
                     app.git_branch_requested = false;
                     app.git_popup_state = ui::GitBranchPopupState {
-                        branch_name: String::new(),
-                        worktree_path: String::new(),
+                        branch_name_textarea: {
+                            let mut textarea = tui_textarea::TextArea::default();
+                            textarea.set_cursor_line_style(ratatui::style::Style::default());
+                            textarea.set_block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::ALL).title("Branch Name"));
+                            textarea
+                        },
+                        worktree_path_textarea: {
+                            let mut textarea = tui_textarea::TextArea::default();
+                            textarea.set_cursor_line_style(ratatui::style::Style::default());
+                            textarea.set_block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::ALL).title("Worktree Path"));
+                            textarea
+                        },
                         selected_option: ui::GitBranchOption::CreateBranch,
                         story_id: 0,
                         editing_branch_name: false,
                         editing_worktree_path: false,
-                        branch_cursor_pos: 0,
-                        worktree_cursor_pos: 0,
                     };
                     continue;
                 }
@@ -1050,14 +1068,22 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
             // Reset git request state
             app.git_branch_requested = false;
             app.git_popup_state = ui::GitBranchPopupState {
-                branch_name: String::new(),
-                worktree_path: String::new(),
+                branch_name_textarea: {
+                    let mut textarea = tui_textarea::TextArea::default();
+                    textarea.set_cursor_line_style(ratatui::style::Style::default());
+                    textarea.set_block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::ALL).title("Branch Name"));
+                    textarea
+                },
+                worktree_path_textarea: {
+                    let mut textarea = tui_textarea::TextArea::default();
+                    textarea.set_cursor_line_style(ratatui::style::Style::default());
+                    textarea.set_block(ratatui::widgets::Block::default().borders(ratatui::widgets::Borders::ALL).title("Worktree Path"));
+                    textarea
+                },
                 selected_option: ui::GitBranchOption::CreateBranch,
                 story_id: 0,
                 editing_branch_name: false,
                 editing_worktree_path: false,
-                branch_cursor_pos: 0,
-                worktree_cursor_pos: 0,
             };
         }
 

@@ -13,7 +13,7 @@ A command-line interface and interactive terminal UI for managing Shortcut stori
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone [<repository-url>](https://github.com/lnds/sc-cli.git)
 cd sc-cli
 
 # Build the project

@@ -204,7 +204,8 @@ mod tests {
             "This is a test description".to_string(),
             "feature".to_string(),
             "user-123".to_string(),
-            500
+            500,
+            None
         ).unwrap();
 
         assert_eq!(story.id, 999);
@@ -230,7 +231,8 @@ mod tests {
             "Description".to_string(),
             "invalid-type".to_string(),
             "user-123".to_string(),
-            500
+            500,
+            None
         );
 
         assert!(result.is_err());

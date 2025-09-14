@@ -34,7 +34,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn update_story_details(&self, _story_id: i64, _name: String, _description: String, _story_type: String) -> Result<Story> {
+        fn update_story_details(&self, _story_id: i64, _name: String, _description: String, _story_type: String, _epic_id: Option<i64>) -> Result<Story> {
             unimplemented!()
         }
 
@@ -46,7 +46,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn create_story(&self, _name: String, _description: String, _story_type: String, _requested_by_id: String, _workflow_state_id: i64) -> Result<Story> {
+        fn create_story(&self, _name: String, _description: String, _story_type: String, _requested_by_id: String, _workflow_state_id: i64, _epic_id: Option<i64>) -> Result<Story> {
             if self.should_fail {
                 Err(anyhow::anyhow!("API Error"))
             } else {

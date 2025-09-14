@@ -139,8 +139,8 @@ pub trait ShortcutApi {
     fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story>;
     fn get_current_member(&self) -> Result<CurrentMember>;
     fn update_story(&self, story_id: i64, owner_ids: Vec<String>) -> Result<Story>;
-    fn update_story_details(&self, story_id: i64, name: String, description: String, story_type: String) -> Result<Story>;
+    fn update_story_details(&self, story_id: i64, name: String, description: String, story_type: String, epic_id: Option<i64>) -> Result<Story>;
     fn get_members(&self) -> Result<Vec<Member>>;
-    fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64) -> Result<Story>;
+    fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64, epic_id: Option<i64>) -> Result<Story>;
     fn get_epics(&self) -> Result<Vec<Epic>>;
 }

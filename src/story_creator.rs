@@ -107,7 +107,8 @@ impl StoryCreator {
             self.description.clone(),
             self.story_type.clone(),
             self.requested_by_id.clone(),
-            self.workflow_state_id
+            self.workflow_state_id,
+            None, // Epic ID not supported in CLI story creator yet
         )
         .context("Failed to create story")
     }

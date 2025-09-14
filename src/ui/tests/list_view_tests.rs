@@ -197,7 +197,7 @@ mod tests {
     fn test_get_selected_story_in_column_view() {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
-        let mut app = App::new(stories, workflows, "test query".to_string(), None);
+        let app = App::new(stories, workflows, "test query".to_string(), None);
 
         // Should be in column view by default
         assert!(!app.list_view_mode);

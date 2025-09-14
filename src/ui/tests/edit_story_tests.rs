@@ -44,8 +44,8 @@ mod tests {
         let story = create_test_story();
         let edit_state = EditPopupState::from_story(&story);
         
-        assert_eq!(edit_state.name, "Test Story");
-        assert_eq!(edit_state.description, "Original description");
+        assert_eq!(edit_state.name_textarea.lines()[0], "Test Story");
+        assert_eq!(edit_state.description_textarea.lines()[0], "Original description");
         assert_eq!(edit_state.story_type, "feature");
         assert_eq!(edit_state.story_type_index, 0); // feature is at index 0
         assert_eq!(edit_state.story_id, 123);
@@ -95,8 +95,8 @@ mod tests {
         // Edit popup should now be shown
         assert!(app.show_edit_popup);
         assert_eq!(app.edit_popup_state.story_id, 123);
-        assert_eq!(app.edit_popup_state.name, "Test Story");
-        assert_eq!(app.edit_popup_state.description, "Original description");
+        assert_eq!(app.edit_popup_state.name_textarea.lines()[0], "Test Story");
+        assert_eq!(app.edit_popup_state.description_textarea.lines()[0], "Original description");
         assert_eq!(app.edit_popup_state.story_type, "feature");
     }
 
@@ -183,7 +183,7 @@ mod tests {
         // Show edit popup
         app.show_edit_popup = true;
         app.edit_popup_state = EditPopupState::from_story(&story);
-        app.edit_popup_state.name = String::new(); // Clear name for testing
+        app.edit_popup_state.name_textarea.delete_line_by_head(); // Clear name for testing
         
         // Type some characters
         let char_event = |c| crossterm::event::KeyEvent {
@@ -199,7 +199,7 @@ mod tests {
         app.handle_key_event(char_event('l')).unwrap();
         app.handle_key_event(char_event('o')).unwrap();
         
-        assert_eq!(app.edit_popup_state.name, "Hello");
+        assert_eq!(app.edit_popup_state.name_textarea.lines()[0], "Hello");
         
         // Test backspace
         let backspace_event = crossterm::event::KeyEvent {
@@ -210,7 +210,7 @@ mod tests {
         };
         
         app.handle_key_event(backspace_event).unwrap();
-        assert_eq!(app.edit_popup_state.name, "Hell");
+        assert_eq!(app.edit_popup_state.name_textarea.lines()[0], "Hell");
     }
 
     #[test]
@@ -224,7 +224,8 @@ mod tests {
         app.show_edit_popup = true;
         app.edit_popup_state = EditPopupState::from_story(&story);
         app.edit_popup_state.selected_field = EditField::Type;
-        app.edit_popup_state.name = "Updated Story".to_string();
+        app.edit_popup_state.name_textarea.delete_line_by_head();
+        app.edit_popup_state.name_textarea.insert_str("Updated Story");
         
         // Press Enter to submit
         let enter_event = crossterm::event::KeyEvent {
@@ -251,7 +252,8 @@ mod tests {
         // Show edit popup
         app.show_edit_popup = true;
         app.edit_popup_state = EditPopupState::from_story(&story);
-        app.edit_popup_state.name = "Modified".to_string();
+        app.edit_popup_state.name_textarea.delete_line_by_head();
+        app.edit_popup_state.name_textarea.insert_str("Modified");
         
         // Press Escape to cancel
         let escape_event = crossterm::event::KeyEvent {
@@ -266,7 +268,7 @@ mod tests {
         // Should reset state and hide popup
         assert!(!app.show_edit_popup);
         assert!(!app.edit_story_requested);
-        assert_eq!(app.edit_popup_state.name, "");
+        assert_eq!(app.edit_popup_state.name_textarea.lines()[0], "");
         assert_eq!(app.edit_popup_state.story_id, 0);
     }
 }

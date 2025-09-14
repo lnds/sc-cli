@@ -129,7 +129,11 @@ mod tests {
         // Press Tab to move to Type
         app.handle_key_event(tab_event).unwrap();
         assert_eq!(app.edit_popup_state.selected_field, EditField::Type);
-        
+
+        // Press Tab to move to Epic
+        app.handle_key_event(tab_event).unwrap();
+        assert_eq!(app.edit_popup_state.selected_field, EditField::Epic);
+
         // Press Tab to cycle back to Name
         app.handle_key_event(tab_event).unwrap();
         assert_eq!(app.edit_popup_state.selected_field, EditField::Name);
@@ -224,10 +228,10 @@ mod tests {
         // Show edit popup and navigate to Type field
         app.show_edit_popup = true;
         app.edit_popup_state = EditPopupState::from_story(&story);
-        app.edit_popup_state.selected_field = EditField::Type;
+        app.edit_popup_state.selected_field = EditField::Epic;
         app.edit_popup_state.name_textarea.delete_line_by_head();
         app.edit_popup_state.name_textarea.insert_str("Updated Story");
-        
+
         // Press Enter to submit
         let enter_event = crossterm::event::KeyEvent {
             code: crossterm::event::KeyCode::Enter,
@@ -235,9 +239,9 @@ mod tests {
             kind: crossterm::event::KeyEventKind::Press,
             state: crossterm::event::KeyEventState::empty(),
         };
-        
+
         app.handle_key_event(enter_event).unwrap();
-        
+
         // Should set edit_story_requested and hide popup
         assert!(app.edit_story_requested);
         assert!(!app.show_edit_popup);

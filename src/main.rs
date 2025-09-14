@@ -868,26 +868,53 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                         .map(|s| s.id)
                         .unwrap_or(500000007); // Default to "To Do" if not found
                     
-                    // Create the story using the popup data
-                    let story_creator = StoryCreator::new(
+                    // Create the story using the popup data including epic
+                    match client.create_story(
                         app.create_popup_state.name_textarea.lines().join(""),
                         app.create_popup_state.description_textarea.lines().join(""),
                         app.create_popup_state.story_type.clone(),
                         current_member.id,
                         workflow_state_id,
-                    );
-                    
-                    match story_creator.create(&client) {
+                        app.create_popup_state.epic_id,
+                    ) {
                         Ok(new_story) => {
-                            // Add the new story to the app
-                            app.stories_by_state
-                                .entry(new_story.workflow_state_id)
-                                .or_default()
-                                .push(new_story);
-                            
-                            // Sort stories by position
-                            if let Some(stories) = app.stories_by_state.get_mut(&workflow_state_id) {
-                                stories.sort_by_key(|s| s.position);
+                            // Add the new story to the unfiltered list
+                            app.all_stories_unfiltered.push(new_story.clone());
+
+                            // If there's an epic filter active, check if the new story matches
+                            if let Some(epic_id) = app.selected_epic_filter {
+                                if new_story.epic_id == Some(epic_id) {
+                                    // Story matches filter, add it
+                                    app.stories_by_state
+                                        .entry(new_story.workflow_state_id)
+                                        .or_default()
+                                        .push(new_story.clone());
+
+                                    // Sort stories by position
+                                    if let Some(stories) = app.stories_by_state.get_mut(&workflow_state_id) {
+                                        stories.sort_by_key(|s| s.position);
+                                    }
+
+                                    // Update list view
+                                    app.all_stories_list.push(new_story);
+                                    app.all_stories_list.sort_by_key(|s| s.position);
+                                }
+                                // If story doesn't match filter, it won't be visible
+                            } else {
+                                // No filter active, add normally
+                                app.stories_by_state
+                                    .entry(new_story.workflow_state_id)
+                                    .or_default()
+                                    .push(new_story.clone());
+
+                                // Sort stories by position
+                                if let Some(stories) = app.stories_by_state.get_mut(&workflow_state_id) {
+                                    stories.sort_by_key(|s| s.position);
+                                }
+
+                                // Update list view
+                                app.all_stories_list.push(new_story);
+                                app.all_stories_list.sort_by_key(|s| s.position);
                             }
                         }
                         Err(e) => {
@@ -911,8 +938,9 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
             let name = app.edit_popup_state.name_textarea.lines().join("");
             let description = app.edit_popup_state.description_textarea.lines().join("");
             let story_type = app.edit_popup_state.story_type.clone();
-            
-            match client.update_story_details(story_id, name, description, story_type) {
+            let epic_id = app.edit_popup_state.epic_id;
+
+            match client.update_story_details(story_id, name, description, story_type, epic_id) {
                 Ok(updated_story) => {
                     // Update the story in our local data
                     update_story_details(&mut app, story_id, updated_story);
@@ -943,6 +971,8 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                 selected_field: ui::EditField::Name,
                 story_type_index: 0,
                 story_id: 0,
+                epic_id: None,
+                epic_selector_index: 0,
             };
             app.edit_story_requested = false;
         }
@@ -1184,6 +1214,11 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
 }
 
 fn update_story_state(app: &mut App, story_id: i64, updated_story: api::Story) {
+    // Update the story in the unfiltered list
+    if let Some(pos) = app.all_stories_unfiltered.iter().position(|s| s.id == story_id) {
+        app.all_stories_unfiltered[pos] = updated_story.clone();
+    }
+
     // Find and remove the story from its current state
     let mut old_state_id = None;
     for (&state_id, stories) in app.stories_by_state.iter_mut() {
@@ -1198,7 +1233,12 @@ fn update_story_state(app: &mut App, story_id: i64, updated_story: api::Story) {
     app.stories_by_state
         .entry(updated_story.workflow_state_id)
         .or_default()
-        .push(updated_story);
+        .push(updated_story.clone());
+
+    // Update the all_stories_list for list view
+    if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {
+        app.all_stories_list[pos] = updated_story;
+    }
 
     // If we removed from the current column and it's now empty, reset selected_row
     if let Some(old_id) = old_state_id
@@ -1210,13 +1250,18 @@ fn update_story_state(app: &mut App, story_id: i64, updated_story: api::Story) {
 }
 
 fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Story) {
+    // Update the story in the unfiltered list
+    if let Some(pos) = app.all_stories_unfiltered.iter().position(|s| s.id == story_id) {
+        app.all_stories_unfiltered[pos] = updated_story.clone();
+    }
+
     // Find and update the story in its current state
     let state_id = updated_story.workflow_state_id;
     if let Some(stories) = app.stories_by_state.get_mut(&state_id)
         && let Some(pos) = stories.iter().position(|s| s.id == story_id) {
             stories[pos] = updated_story.clone();
         }
-    
+
     // Also update the story in the all_stories_list for list view
     if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {
         app.all_stories_list[pos] = updated_story;
@@ -1224,16 +1269,34 @@ fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Stor
 }
 
 fn update_story_details(app: &mut App, story_id: i64, updated_story: api::Story) {
-    // Find and update the story in its current state
-    let state_id = updated_story.workflow_state_id;
-    if let Some(stories) = app.stories_by_state.get_mut(&state_id)
-        && let Some(pos) = stories.iter().position(|s| s.id == story_id) {
-            stories[pos] = updated_story.clone();
+    // Update the story in the unfiltered list first
+    if let Some(pos) = app.all_stories_unfiltered.iter().position(|s| s.id == story_id) {
+        app.all_stories_unfiltered[pos] = updated_story.clone();
+    }
+
+    // If there's an epic filter active, reapply it
+    if app.selected_epic_filter.is_some() {
+        app.apply_epic_filter();
+        // Rebuild the list view after filtering
+        app.all_stories_list = app.stories_by_state
+            .values()
+            .flatten()
+            .cloned()
+            .collect();
+        app.all_stories_list.sort_by_key(|s| s.position);
+    } else {
+        // No filter active, update normally
+        // Find and update the story in its current state
+        let state_id = updated_story.workflow_state_id;
+        if let Some(stories) = app.stories_by_state.get_mut(&state_id)
+            && let Some(pos) = stories.iter().position(|s| s.id == story_id) {
+                stories[pos] = updated_story.clone();
+            }
+
+        // Also update the story in the all_stories_list for list view
+        if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {
+            app.all_stories_list[pos] = updated_story;
         }
-    
-    // Also update the story in the all_stories_list for list view
-    if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {
-        app.all_stories_list[pos] = updated_story;
     }
 }
 

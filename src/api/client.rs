@@ -280,17 +280,22 @@ impl ShortcutApi for ShortcutClient {
         Ok(updated_story)
     }
 
-    fn update_story_details(&self, story_id: i64, name: String, description: String, story_type: String) -> Result<Story> {
+    fn update_story_details(&self, story_id: i64, name: String, description: String, story_type: String, epic_id: Option<i64>) -> Result<Story> {
         let url = format!("{}/stories/{}", self.base_url, story_id);
-        
-        let update_payload = serde_json::json!({
+
+        let mut update_payload = serde_json::json!({
             "name": name,
             "description": description,
             "story_type": story_type
         });
 
+        // Add epic_id if provided (null to unset)
+        if let Some(payload_obj) = update_payload.as_object_mut() {
+            payload_obj.insert("epic_id".to_string(), epic_id.map(|id| serde_json::json!(id)).unwrap_or(serde_json::Value::Null));
+        }
+
         if self.debug {
-            eprintln!("Updating story {story_id} details: name='{name}', description='{description}', type='{story_type}'");
+            eprintln!("Updating story {story_id} details: name='{name}', description='{description}', type='{story_type}', epic_id={:?}", epic_id);
         }
         
         let response = self
@@ -362,16 +367,22 @@ impl ShortcutApi for ShortcutClient {
         Ok(members)
     }
 
-    fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64) -> Result<Story> {
+    fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64, epic_id: Option<i64>) -> Result<Story> {
         let url = format!("{}/stories", self.base_url);
-        
-        let create_payload = serde_json::json!({
+
+        let mut create_payload = serde_json::json!({
             "name": name,
             "description": description,
             "story_type": story_type,
             "requested_by_id": requested_by_id,
             "workflow_state_id": workflow_state_id
         });
+
+        // Add epic_id if provided
+        if let Some(id) = epic_id
+            && let Some(payload_obj) = create_payload.as_object_mut() {
+                payload_obj.insert("epic_id".to_string(), serde_json::json!(id));
+            }
 
         if self.debug {
             eprintln!("Creating story with payload: {}", serde_json::to_string_pretty(&create_payload)?);

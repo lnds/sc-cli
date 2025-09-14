@@ -137,6 +137,8 @@ pub struct CreatePopupState {
     pub story_type: String,
     pub selected_field: CreateField,
     pub story_type_index: usize,
+    pub epic_id: Option<i64>,
+    pub epic_selector_index: usize, // 0 = None, 1+ = epic index
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -144,6 +146,7 @@ pub enum CreateField {
     Name,
     Description,
     Type,
+    Epic,
 }
 
 #[derive(Clone)]
@@ -154,6 +157,8 @@ pub struct EditPopupState {
     pub selected_field: EditField,
     pub story_type_index: usize,
     pub story_id: i64,
+    pub epic_id: Option<i64>,
+    pub epic_selector_index: usize, // 0 = None, 1+ = epic index
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -161,6 +166,7 @@ pub enum EditField {
     Name,
     Description,
     Type,
+    Epic,
 }
 
 #[derive(Clone)]
@@ -230,6 +236,8 @@ impl Default for CreatePopupState {
             story_type: "feature".to_string(),
             selected_field: CreateField::Name,
             story_type_index: 0,
+            epic_id: None,
+            epic_selector_index: 0,
         }
     }
 }
@@ -268,6 +276,8 @@ impl EditPopupState {
             selected_field: EditField::Name,
             story_type_index,
             story_id: story.id,
+            epic_id: story.epic_id,
+            epic_selector_index: 0, // Will be set when popup is opened
         }
     }
 }
@@ -386,6 +396,8 @@ impl App {
                 selected_field: EditField::Name,
                 story_type_index: 0,
                 story_id: 0,
+                epic_id: None,
+                epic_selector_index: 0,
             },
             workflow_state_map,
             member_cache: HashMap::new(),
@@ -826,6 +838,8 @@ impl App {
                         selected_field: EditField::Name,
                         story_type_index: 0,
                         story_id: 0,
+                        epic_id: None,
+                        epic_selector_index: 0,
                     };
                 }
                 KeyCode::Tab => {
@@ -833,11 +847,12 @@ impl App {
                     self.edit_popup_state.selected_field = match self.edit_popup_state.selected_field {
                         EditField::Name => EditField::Description,
                         EditField::Description => EditField::Type,
-                        EditField::Type => EditField::Name,
+                        EditField::Type => EditField::Epic,
+                        EditField::Epic => EditField::Name,
                     };
                 }
                 KeyCode::Enter => {
-                    if self.edit_popup_state.selected_field == EditField::Type {
+                    if self.edit_popup_state.selected_field == EditField::Epic {
                         // Submit the story edit
                         if !self.edit_popup_state.name_textarea.lines().join("").trim().is_empty() {
                             self.edit_story_requested = true;
@@ -848,7 +863,8 @@ impl App {
                         self.edit_popup_state.selected_field = match self.edit_popup_state.selected_field {
                             EditField::Name => EditField::Description,
                             EditField::Description => EditField::Type,
-                            EditField::Type => EditField::Type,
+                            EditField::Type => EditField::Epic,
+                            EditField::Epic => EditField::Epic,
                         };
                     }
                 }
@@ -868,6 +884,29 @@ impl App {
                     }
                     self.edit_popup_state.story_type = types[self.edit_popup_state.story_type_index].to_string();
                 }
+                KeyCode::Up | KeyCode::Down if self.edit_popup_state.selected_field == EditField::Epic => {
+                    // Cycle through epics (including None option)
+                    let epic_count = self.epics.len() + 1; // +1 for None option
+                    if key.code == KeyCode::Down {
+                        self.edit_popup_state.epic_selector_index =
+                            (self.edit_popup_state.epic_selector_index + 1) % epic_count;
+                    } else {
+                        self.edit_popup_state.epic_selector_index =
+                            if self.edit_popup_state.epic_selector_index == 0 {
+                                epic_count - 1
+                            } else {
+                                self.edit_popup_state.epic_selector_index - 1
+                            };
+                    }
+                    // Update epic_id based on selection
+                    self.edit_popup_state.epic_id = if self.edit_popup_state.epic_selector_index == 0 {
+                        None
+                    } else if self.edit_popup_state.epic_selector_index <= self.epics.len() {
+                        Some(self.epics[self.edit_popup_state.epic_selector_index - 1].id)
+                    } else {
+                        None
+                    };
+                }
                 _ => {
                     // Handle text input for TextArea widgets
                     match self.edit_popup_state.selected_field {
@@ -878,6 +917,7 @@ impl App {
                             self.edit_popup_state.description_textarea.input(convert_key_to_ratatui(key));
                         }
                         EditField::Type => {}
+                        EditField::Epic => {}
                     }
                 }
             }
@@ -893,11 +933,12 @@ impl App {
                     self.create_popup_state.selected_field = match self.create_popup_state.selected_field {
                         CreateField::Name => CreateField::Description,
                         CreateField::Description => CreateField::Type,
-                        CreateField::Type => CreateField::Name,
+                        CreateField::Type => CreateField::Epic,
+                        CreateField::Epic => CreateField::Name,
                     };
                 }
                 KeyCode::Enter => {
-                    if self.create_popup_state.selected_field == CreateField::Type {
+                    if self.create_popup_state.selected_field == CreateField::Epic {
                         // Submit the story
                         if !self.create_popup_state.name_textarea.lines().join("").trim().is_empty() {
                             self.create_story_requested = true;
@@ -908,7 +949,8 @@ impl App {
                         self.create_popup_state.selected_field = match self.create_popup_state.selected_field {
                             CreateField::Name => CreateField::Description,
                             CreateField::Description => CreateField::Type,
-                            CreateField::Type => CreateField::Type,
+                            CreateField::Type => CreateField::Epic,
+                            CreateField::Epic => CreateField::Epic,
                         };
                     }
                 }
@@ -916,17 +958,40 @@ impl App {
                     // Cycle through story types
                     let types = ["feature", "bug", "chore"];
                     if key.code == KeyCode::Down {
-                        self.create_popup_state.story_type_index = 
+                        self.create_popup_state.story_type_index =
                             (self.create_popup_state.story_type_index + 1) % types.len();
                     } else {
-                        self.create_popup_state.story_type_index = 
-                            if self.create_popup_state.story_type_index == 0 { 
-                                types.len() - 1 
-                            } else { 
-                                self.create_popup_state.story_type_index - 1 
+                        self.create_popup_state.story_type_index =
+                            if self.create_popup_state.story_type_index == 0 {
+                                types.len() - 1
+                            } else {
+                                self.create_popup_state.story_type_index - 1
                             };
                     }
                     self.create_popup_state.story_type = types[self.create_popup_state.story_type_index].to_string();
+                }
+                KeyCode::Up | KeyCode::Down if self.create_popup_state.selected_field == CreateField::Epic => {
+                    // Cycle through epics (including None option)
+                    let epic_count = self.epics.len() + 1; // +1 for None option
+                    if key.code == KeyCode::Down {
+                        self.create_popup_state.epic_selector_index =
+                            (self.create_popup_state.epic_selector_index + 1) % epic_count;
+                    } else {
+                        self.create_popup_state.epic_selector_index =
+                            if self.create_popup_state.epic_selector_index == 0 {
+                                epic_count - 1
+                            } else {
+                                self.create_popup_state.epic_selector_index - 1
+                            };
+                    }
+                    // Update epic_id based on selection
+                    self.create_popup_state.epic_id = if self.create_popup_state.epic_selector_index == 0 {
+                        None
+                    } else if self.create_popup_state.epic_selector_index <= self.epics.len() {
+                        Some(self.epics[self.create_popup_state.epic_selector_index - 1].id)
+                    } else {
+                        None
+                    };
                 }
                 _ => {
                     // Handle text input for TextArea widgets
@@ -938,6 +1003,7 @@ impl App {
                             self.create_popup_state.description_textarea.input(convert_key_to_ratatui(key));
                         }
                         CreateField::Type => {}
+                        CreateField::Epic => {}
                     }
                 }
             }
@@ -997,6 +1063,12 @@ impl App {
                     if let Some(story) = self.get_selected_story().cloned() {
                         self.show_edit_popup = true;
                         self.edit_popup_state = EditPopupState::from_story(&story);
+                        // Set the epic selector index based on current epic
+                        self.edit_popup_state.epic_selector_index = if let Some(epic_id) = story.epic_id {
+                            self.epics.iter().position(|e| e.id == epic_id).map(|i| i + 1).unwrap_or(0)
+                        } else {
+                            0 // None selected
+                        };
                     }
                 }
                 KeyCode::Char('n') => {
@@ -1545,16 +1617,16 @@ fn draw_state_selector_popup(frame: &mut Frame, story: &Story, app: &App) {
 }
 
 fn draw_create_popup(frame: &mut Frame, app: &App) {
-    let area = centered_rect(60, 50, frame.area());
+    let area = centered_rect(60, 55, frame.area());
     frame.render_widget(Clear, area);
-    
+
     // Create the main popup block
     let popup = Block::default()
         .title("Create New Story")
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::Black).fg(Color::White));
     frame.render_widget(popup, area);
-    
+
     // Create inner area for form fields
     let inner = Rect {
         x: area.x + 1,
@@ -1562,7 +1634,7 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
         width: area.width.saturating_sub(2),
         height: area.height.saturating_sub(2),
     };
-    
+
     // Layout for form fields
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -1570,6 +1642,7 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
             Constraint::Length(3), // Name field
             Constraint::Length(5), // Description field
             Constraint::Length(3), // Type field
+            Constraint::Length(3), // Epic field
             Constraint::Min(1),    // Space
             Constraint::Length(2), // Help text
         ])
@@ -1637,31 +1710,66 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
         .block(type_block)
         .alignment(Alignment::Center);
     frame.render_widget(type_widget, chunks[2]);
-    
-    // Help text
-    let help_text = if app.create_popup_state.selected_field == CreateField::Type {
-        "[↑/↓] change type | [Tab] next field | [Enter] submit | [Esc] cancel"
+
+    // Epic field
+    let epic_style = if app.create_popup_state.selected_field == CreateField::Epic {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
-        "[Tab] next field | [Enter] next/submit | [Esc] cancel"
+        Style::default().fg(Color::White)
     };
-    
+
+    let epic_block = Block::default()
+        .title("Epic")
+        .borders(Borders::ALL)
+        .border_style(epic_style);
+
+    let epic_text = if let Some(epic_id) = app.create_popup_state.epic_id {
+        // Find epic name from the list
+        app.epics.iter()
+            .find(|e| e.id == epic_id)
+            .map(|e| {
+                if app.create_popup_state.selected_field == CreateField::Epic {
+                    format!("< {} >", e.name)
+                } else {
+                    e.name.clone()
+                }
+            })
+            .unwrap_or_else(|| "Unknown Epic".to_string())
+    } else if app.create_popup_state.selected_field == CreateField::Epic {
+        "< None >".to_string()
+    } else {
+        "None".to_string()
+    };
+
+    let epic_widget = Paragraph::new(epic_text)
+        .block(epic_block)
+        .alignment(Alignment::Center);
+    frame.render_widget(epic_widget, chunks[3]);
+
+    // Help text
+    let help_text = match app.create_popup_state.selected_field {
+        CreateField::Type => "[↑/↓] change type | [Tab] next field | [Enter] next | [Esc] cancel",
+        CreateField::Epic => "[↑/↓] change epic | [Tab] next field | [Enter] submit | [Esc] cancel",
+        _ => "[Tab] next field | [Enter] next/submit | [Esc] cancel",
+    };
+
     let help = Paragraph::new(help_text)
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
-    frame.render_widget(help, chunks[4]);
+    frame.render_widget(help, chunks[5]);
 }
 
 fn draw_edit_popup(frame: &mut Frame, app: &App) {
-    let area = centered_rect(60, 50, frame.area());
+    let area = centered_rect(60, 55, frame.area());
     frame.render_widget(Clear, area);
-    
+
     // Create the main popup block
     let popup = Block::default()
         .title(format!("Edit Story #{}", app.edit_popup_state.story_id))
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::Black).fg(Color::White));
     frame.render_widget(popup, area);
-    
+
     // Create inner area for form fields
     let inner = Rect {
         x: area.x + 1,
@@ -1669,7 +1777,7 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
         width: area.width.saturating_sub(2),
         height: area.height.saturating_sub(2),
     };
-    
+
     // Layout for form fields
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -1677,6 +1785,7 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
             Constraint::Length(3), // Name field
             Constraint::Length(5), // Description field
             Constraint::Length(3), // Type field
+            Constraint::Length(3), // Epic field
             Constraint::Min(1),    // Space
             Constraint::Length(2), // Help text
         ])
@@ -1744,18 +1853,53 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
         .block(type_block)
         .alignment(Alignment::Center);
     frame.render_widget(type_widget, chunks[2]);
-    
-    // Help text
-    let help_text = if app.edit_popup_state.selected_field == EditField::Type {
-        "[↑/↓] change type | [Tab] next field | [Enter] save | [Esc] cancel"
+
+    // Epic field
+    let epic_style = if app.edit_popup_state.selected_field == EditField::Epic {
+        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
-        "[Tab] next field | [Enter] next/save | [Esc] cancel"
+        Style::default().fg(Color::White)
     };
-    
+
+    let epic_block = Block::default()
+        .title("Epic")
+        .borders(Borders::ALL)
+        .border_style(epic_style);
+
+    let epic_text = if let Some(epic_id) = app.edit_popup_state.epic_id {
+        // Find epic name from the list
+        app.epics.iter()
+            .find(|e| e.id == epic_id)
+            .map(|e| {
+                if app.edit_popup_state.selected_field == EditField::Epic {
+                    format!("< {} >", e.name)
+                } else {
+                    e.name.clone()
+                }
+            })
+            .unwrap_or_else(|| "Unknown Epic".to_string())
+    } else if app.edit_popup_state.selected_field == EditField::Epic {
+        "< None >".to_string()
+    } else {
+        "None".to_string()
+    };
+
+    let epic_widget = Paragraph::new(epic_text)
+        .block(epic_block)
+        .alignment(Alignment::Center);
+    frame.render_widget(epic_widget, chunks[3]);
+
+    // Help text
+    let help_text = match app.edit_popup_state.selected_field {
+        EditField::Type => "[↑/↓] change type | [Tab] next field | [Enter] next | [Esc] cancel",
+        EditField::Epic => "[↑/↓] change epic | [Tab] next field | [Enter] save | [Esc] cancel",
+        _ => "[Tab] next field | [Enter] next/save | [Esc] cancel",
+    };
+
     let help = Paragraph::new(help_text)
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
-    frame.render_widget(help, chunks[4]);
+    frame.render_widget(help, chunks[5]);
 }
 
 fn draw_git_popup(frame: &mut Frame, app: &App) {

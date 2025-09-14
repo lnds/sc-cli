@@ -151,7 +151,8 @@ impl StoryEditor {
             self.story_id,
             self.name.clone(),
             self.description.clone(),
-            self.story_type.clone()
+            self.story_type.clone(),
+            None // Epic ID not supported in CLI story editor yet
         )
         .context("Failed to update story")
     }

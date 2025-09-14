@@ -594,6 +594,17 @@ fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
         .get_workflows()
         .context("Failed to fetch workflows")?;
 
+    // Get epics for filtering
+    if args.debug {
+        eprintln!("Fetching epics...");
+    }
+    let epics = client
+        .get_epics()
+        .context("Failed to fetch epics")?;
+    if args.debug {
+        eprintln!("Found {} epics", epics.len());
+    }
+
     // Build search query
     let query = if let Some(search) = args.search {
         search
@@ -729,7 +740,10 @@ fn handle_view_command(args: ViewCommandArgs) -> Result<()> {
     
     // Create app with stories and workflows
     let mut app = App::new(stories, workflows.clone(), query.clone(), next_page_token);
-    
+
+    // Set epics in the app for filtering
+    app.set_epics(epics.clone());
+
     // Populate the member cache in the app
     for (id, name) in member_cache {
         app.add_member_to_cache(id, name);
@@ -1101,16 +1115,18 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                     
                     // Create a fresh app instance with the new data
                     let new_app = App::new(search_result.stories, workflows.clone(), app.search_query.clone(), search_result.next_page_token);
-                    
-                    // Preserve member cache and user ID from the old app
+
+                    // Preserve member cache, user ID, and epics from the old app
                     let old_member_cache = app.member_cache.clone();
                     let old_user_id = app.current_user_id.clone();
-                    
+                    let old_epics = app.epics.clone();
+
                     // Replace the app with fresh data
                     app = new_app;
-                    
-                    // Restore member cache and user ID
+
+                    // Restore member cache, user ID, and epics
                     app.member_cache = old_member_cache;
+                    app.epics = old_epics;
                     app.current_user_id = old_user_id;
                     
                     app.is_loading = false;

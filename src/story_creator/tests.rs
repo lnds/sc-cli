@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use crate::api::{ShortcutApi, Story, Workflow, Member, CurrentMember};
+    use crate::api::{ShortcutApi, Story, Workflow, Member, CurrentMember, Epic};
     use anyhow::Result;
 
     struct MockApi {
@@ -53,6 +53,10 @@ mod tests {
                 Ok(self.expected_story.clone())
             }
         }
+
+        fn get_epics(&self) -> Result<Vec<Epic>> {
+            Ok(Vec::new())
+        }
     }
 
     #[test]
@@ -89,6 +93,7 @@ mod tests {
             moved_at: None,
             comments: vec![],
             formatted_vcs_branch_name: None,
+            epic_id: None,
         };
 
         let mock_api = MockApi {
@@ -130,6 +135,7 @@ mod tests {
             moved_at: None,
             comments: vec![],
             formatted_vcs_branch_name: None,
+            epic_id: None,
         };
 
         let mock_api = MockApi {

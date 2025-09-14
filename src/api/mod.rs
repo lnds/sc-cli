@@ -31,6 +31,8 @@ pub struct Story {
     pub comments: Vec<Comment>,
     #[serde(default)]
     pub formatted_vcs_branch_name: Option<String>,
+    #[serde(default)]
+    pub epic_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,6 +107,21 @@ pub struct CurrentMember {
     pub mention_name: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Epic {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    pub app_url: String,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub owner_ids: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct SearchStoriesResult {
     pub stories: Vec<Story>,
@@ -125,4 +142,5 @@ pub trait ShortcutApi {
     fn update_story_details(&self, story_id: i64, name: String, description: String, story_type: String) -> Result<Story>;
     fn get_members(&self) -> Result<Vec<Member>>;
     fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64) -> Result<Story>;
+    fn get_epics(&self) -> Result<Vec<Epic>>;
 }

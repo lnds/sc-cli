@@ -22,6 +22,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
                 position: 1,
             },
             Story {
@@ -39,6 +40,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
                 position: 1,
             },
         ]

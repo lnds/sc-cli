@@ -1,7 +1,7 @@
 use super::*;
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
-use super::CurrentMember;
+use super::{CurrentMember, Epic};
 
 pub struct ShortcutClient {
     pub(crate) client: Client,
@@ -466,5 +466,40 @@ impl ShortcutApi for ShortcutClient {
             next_page_token,
             total: search_response.stories.total,
         })
+    }
+
+    fn get_epics(&self) -> Result<Vec<Epic>> {
+        let url = format!("{}/epics", self.base_url);
+
+        if self.debug {
+            eprintln!("Fetching epics...");
+        }
+
+        let response = self
+            .client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .context("Failed to send epics request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Epics response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to get epics: {}. Error: {}", status, error_text);
+        }
+
+        let epics: Vec<Epic> = response
+            .json()
+            .context("Failed to parse epics response")?;
+
+        if self.debug {
+            eprintln!("Successfully fetched {} epics", epics.len());
+        }
+
+        Ok(epics)
     }
 }

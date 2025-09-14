@@ -24,6 +24,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
             Story {
                 id: 2,
@@ -41,6 +42,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
             Story {
                 id: 3,
@@ -58,6 +60,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
         ]
     }
@@ -261,6 +264,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
             Story {
                 id: 1,
@@ -278,6 +282,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
             Story {
                 id: 2,
@@ -295,6 +300,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
         ];
         
@@ -434,6 +440,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
             Story {
                 id: 2,
@@ -451,6 +458,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
         ];
 
@@ -513,6 +521,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
         ];
 
@@ -604,6 +613,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
+            epic_id: None,
             },
         ];
 

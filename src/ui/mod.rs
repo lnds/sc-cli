@@ -1,4 +1,4 @@
-use crate::api::{Story, Workflow};
+use crate::api::{Epic, Story, Workflow};
 use crate::git::GitContext;
 use chrono::{DateTime, Datelike, Duration, Utc, Weekday};
 use crossterm::event::{self, KeyCode};
@@ -122,6 +122,12 @@ pub struct App {
     pub git_result_state: GitResultState, // Git result popup state
     // Refresh state
     pub refresh_requested: bool, // Flag to request refreshing all stories
+    // Epic filtering state
+    pub epics: Vec<Epic>, // List of available epics
+    pub selected_epic_filter: Option<i64>, // Selected epic ID to filter by
+    pub show_epic_selector: bool, // Flag to show epic selector popup
+    pub epic_selector_index: usize, // Selected index in epic selector
+    pub all_stories_unfiltered: Vec<Story>, // Keep unfiltered stories for toggling
 }
 
 #[derive(Clone)]
@@ -345,6 +351,9 @@ impl App {
         // Create a flattened list of all stories for list view, sorted by position
         let mut all_stories_list = filtered_stories.clone();
         all_stories_list.sort_by_key(|s| s.position);
+
+        // Keep unfiltered stories for epic filtering
+        let all_stories_unfiltered = filtered_stories.clone();
         
         let git_context = GitContext::detect().unwrap_or(GitContext {
             repo_type: crate::git::GitRepoType::NotARepo,
@@ -430,6 +439,11 @@ impl App {
                 selected_option: GitResultOption::Continue,
             },
             refresh_requested: false,
+            epics: Vec::new(),
+            selected_epic_filter: None,
+            show_epic_selector: false,
+            epic_selector_index: 0,
+            all_stories_unfiltered,
         }
     }
 
@@ -783,6 +797,18 @@ impl App {
                     _ => {}
                 }
             }
+        } else if self.show_epic_selector {
+            // Handle epic selector navigation
+            match key.code {
+                KeyCode::Char('j') | KeyCode::Down => self.next_epic_selection(),
+                KeyCode::Char('k') | KeyCode::Up => self.previous_epic_selection(),
+                KeyCode::Enter => self.apply_selected_epic_filter(),
+                KeyCode::Esc => {
+                    self.show_epic_selector = false;
+                    self.epic_selector_index = 0;
+                }
+                _ => {}
+            }
         } else if self.show_edit_popup {
             // Handle edit popup input
             match key.code {
@@ -990,6 +1016,10 @@ impl App {
                     // Refresh stories - trigger a reload from the beginning
                     self.refresh_stories();
                 }
+                KeyCode::Char('f') => {
+                    // Toggle epic filter selector
+                    self.toggle_epic_selector();
+                }
                 KeyCode::Char('g') => {
                     // Create git branch for selected story
                     if self.git_context.is_git_repo() {
@@ -1065,10 +1095,9 @@ impl App {
     }
 
     pub fn merge_stories(&mut self, new_stories: Vec<Story>, next_page_token: Option<String>) {
-        let mut actually_added = 0;
-        
+
         // Filter new stories using the same logic as App::new
-        let filtered_stories: Vec<&Story> = new_stories.iter().filter(|story| {
+        let filtered_stories: Vec<Story> = new_stories.into_iter().filter(|story| {
             if is_done_state(story.workflow_state_id, &self.workflows) {
                 // For Done states, only keep stories completed in the current week
                 if let Some(completed_at) = &story.completed_at {
@@ -1084,42 +1113,19 @@ impl App {
             // Keep all non-Done stories
             true
         }).collect();
-        
-        // Add filtered stories to existing state buckets, avoiding duplicates
-        for story in filtered_stories {
-            let state_stories = self.stories_by_state
-                .entry(story.workflow_state_id)
-                .or_default();
-            
-            // Check if story already exists (by ID)
-            if !state_stories.iter().any(|existing| existing.id == story.id) {
-                state_stories.push(story.clone());
-                actually_added += 1;
+
+        // Add filtered stories to unfiltered list, avoiding duplicates
+        for story in filtered_stories.iter() {
+            if !self.all_stories_unfiltered.iter().any(|existing| existing.id == story.id) {
+                self.all_stories_unfiltered.push(story.clone());
             }
         }
-        
-        // Sort stories within each state by position
-        for stories in self.stories_by_state.values_mut() {
-            stories.sort_by_key(|s| s.position);
-        }
-        
-        // Apply limit of 10 stories for Done states
-        for (&state_id, stories) in self.stories_by_state.iter_mut() {
-            if is_done_state(state_id, &self.workflows) && stories.len() > 10 {
-                stories.truncate(10);
-            }
-        }
-        
-        // Rebuild the flattened list for list view
-        self.all_stories_list.clear();
-        for stories in self.stories_by_state.values() {
-            self.all_stories_list.extend(stories.iter().cloned());
-        }
-        self.all_stories_list.sort_by_key(|s| s.position);
-        
+
+        // Re-apply epic filter to update the display
+        self.apply_epic_filter();
+
         // Update pagination state
         self.next_page_token = next_page_token;
-        self.total_loaded_stories += actually_added;
         self.is_loading = false;
         self.load_more_requested = false;
     }
@@ -1139,18 +1145,115 @@ impl App {
         // Set flag to request a refresh
         self.refresh_requested = true;
         self.is_loading = true;
-        
+
         // Clear existing stories to prepare for fresh data
         self.stories_by_state.clear();
         self.all_stories_list.clear();
+        self.all_stories_unfiltered.clear();
         self.total_loaded_stories = 0;
         self.next_page_token = None;
-        
+
         // Reset selection to avoid out-of-bounds issues
         self.selected_column = 0;
         self.selected_row = 0;
         self.list_selected_index = 0;
         self.list_scroll_offset = 0;
+    }
+
+    pub fn set_epics(&mut self, epics: Vec<Epic>) {
+        self.epics = epics;
+    }
+
+    pub fn apply_epic_filter(&mut self) {
+        // Start with all unfiltered stories
+        let filtered_stories = if let Some(epic_id) = self.selected_epic_filter {
+            // Filter stories by selected epic
+            self.all_stories_unfiltered.iter()
+                .filter(|story| story.epic_id == Some(epic_id))
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            // No filter, use all stories
+            self.all_stories_unfiltered.clone()
+        };
+
+        // Clear current grouped stories
+        self.stories_by_state.clear();
+
+        // Re-group filtered stories by workflow state
+        for story in filtered_stories.iter() {
+            self.stories_by_state
+                .entry(story.workflow_state_id)
+                .or_default()
+                .push(story.clone());
+        }
+
+        // Sort stories within each state by position
+        for stories in self.stories_by_state.values_mut() {
+            stories.sort_by_key(|s| s.position);
+        }
+
+        // Apply limit of 10 stories for Done states
+        for (&state_id, stories) in self.stories_by_state.iter_mut() {
+            if is_done_state(state_id, &self.workflows) && stories.len() > 10 {
+                stories.truncate(10);
+            }
+        }
+
+        // Rebuild the flattened list for list view
+        self.all_stories_list.clear();
+        for stories in self.stories_by_state.values() {
+            self.all_stories_list.extend(stories.iter().cloned());
+        }
+        self.all_stories_list.sort_by_key(|s| s.position);
+
+        // Update total count
+        self.total_loaded_stories = self.all_stories_list.len();
+
+        // Reset selections to avoid out-of-bounds
+        self.selected_column = 0;
+        self.selected_row = 0;
+        self.list_selected_index = 0;
+        self.list_scroll_offset = 0;
+    }
+
+    pub fn toggle_epic_selector(&mut self) {
+        self.show_epic_selector = !self.show_epic_selector;
+        if self.show_epic_selector {
+            self.epic_selector_index = 0;
+        }
+    }
+
+    pub fn next_epic_selection(&mut self) {
+        // +1 for the "All Stories" option
+        let total_options = self.epics.len() + 1;
+        if total_options > 0 {
+            self.epic_selector_index = (self.epic_selector_index + 1) % total_options;
+        }
+    }
+
+    pub fn previous_epic_selection(&mut self) {
+        // +1 for the "All Stories" option
+        let total_options = self.epics.len() + 1;
+        if total_options > 0 {
+            if self.epic_selector_index == 0 {
+                self.epic_selector_index = total_options - 1;
+            } else {
+                self.epic_selector_index -= 1;
+            }
+        }
+    }
+
+    pub fn apply_selected_epic_filter(&mut self) {
+        if self.epic_selector_index == 0 {
+            // "All Stories" selected
+            self.selected_epic_filter = None;
+        } else if self.epic_selector_index > 0 && self.epic_selector_index <= self.epics.len() {
+            // Epic selected
+            self.selected_epic_filter = Some(self.epics[self.epic_selector_index - 1].id);
+        }
+        self.show_epic_selector = false;
+        self.apply_epic_filter();
     }
 }
 
@@ -1164,9 +1267,28 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         ])
         .split(frame.area());
 
-    // Header
-    let header = Paragraph::new("Shortcut Stories TUI")
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+    // Header with epic filter status
+    let (header_text, header_style) = if let Some(epic_id) = app.selected_epic_filter {
+        if let Some(epic) = app.epics.iter().find(|e| e.id == epic_id) {
+            (
+                format!("Shortcut Stories TUI | 🔍 Epic: {}", epic.name),
+                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            )
+        } else {
+            (
+                "Shortcut Stories TUI".to_string(),
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            )
+        }
+    } else {
+        (
+            "Shortcut Stories TUI | All Stories".to_string(),
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        )
+    };
+
+    let header = Paragraph::new(header_text)
+        .style(header_style)
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
     frame.render_widget(header, chunks[0]);
@@ -1190,19 +1312,31 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         } else {
             format!("Loading more stories... | {} stories loaded", app.total_loaded_stories)
         }
+    } else if app.show_epic_selector {
+        "[↑/k] [↓/j] select epic | [Enter] apply filter | [Esc] cancel".to_string()
     } else if app.list_view_mode {
         // List view mode footer
-        if app.has_more_stories() {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] column view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+        let story_count_text = if app.selected_epic_filter.is_some() {
+            format!("{} filtered", app.all_stories_list.len())
         } else {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] column view | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("{} stories", app.total_loaded_stories)
+        };
+        if app.has_more_stories() {
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] column view | [n] more | [q] quit | {}", story_count_text)
+        } else {
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] column view | [q] quit | {}", story_count_text)
         }
     } else {
         // Column view mode footer
-        if app.has_more_stories() {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] list view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+        let story_count_text = if app.selected_epic_filter.is_some() {
+            format!("{} filtered", app.all_stories_list.len())
         } else {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] list view | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("{} stories", app.total_loaded_stories)
+        };
+        if app.has_more_stories() {
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] list | [n] more | [q] quit | {}", story_count_text)
+        } else {
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] list | [q] quit | {}", story_count_text)
         }
     };
     let footer = Paragraph::new(footer_text)
@@ -1242,6 +1376,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     
     if app.show_git_result_popup {
         draw_git_result_popup(frame, app);
+    }
+
+    // Epic selector popup
+    if app.show_epic_selector {
+        draw_epic_selector_popup(frame, app);
     }
 }
 
@@ -2131,6 +2270,65 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
             .block(Block::default().borders(Borders::ALL));
         frame.render_widget(empty, area);
     }
+}
+
+fn draw_epic_selector_popup(frame: &mut Frame, app: &App) {
+    let area = centered_rect(60, 60, frame.area());
+    frame.render_widget(Clear, area);
+
+    // Create list items for epics
+    let mut items: Vec<ListItem> = Vec::new();
+
+    // Add "All Stories" option
+    let all_stories_style = if app.epic_selector_index == 0 {
+        Style::default()
+            .bg(Color::DarkGray)
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(Color::White)
+    };
+    items.push(ListItem::new(" All Stories (no filter) ").style(all_stories_style));
+
+    // Add each epic
+    for (idx, epic) in app.epics.iter().enumerate() {
+        let is_selected = idx + 1 == app.epic_selector_index;
+        let is_current_filter = Some(epic.id) == app.selected_epic_filter;
+
+        let style = if is_selected {
+            Style::default()
+                .bg(Color::DarkGray)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
+        } else if is_current_filter {
+            Style::default().fg(Color::Cyan)
+        } else {
+            Style::default().fg(Color::White)
+        };
+
+        let display_text = format!(" {} ", epic.name);
+        items.push(ListItem::new(display_text).style(style));
+    }
+
+    // Create title with current filter status
+    let title = if let Some(epic_id) = app.selected_epic_filter {
+        if let Some(epic) = app.epics.iter().find(|e| e.id == epic_id) {
+            format!(" Filter by Epic (Current: {}) ", epic.name)
+        } else {
+            " Filter by Epic ".to_string()
+        }
+    } else {
+        " Filter by Epic (Current: All Stories) ".to_string()
+    };
+
+    let list = List::new(items)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title(title)
+            .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+            .border_style(Style::default().fg(Color::Yellow)));
+
+    frame.render_widget(list, area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

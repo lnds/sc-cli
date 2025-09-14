@@ -19,6 +19,7 @@ fn test_story_editor_from_story() {
         moved_at: None,
         comments: vec![],
         formatted_vcs_branch_name: None,
+        epic_id: None,
     };
 
     let editor = StoryEditor::from_story(&story);

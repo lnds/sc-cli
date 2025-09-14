@@ -191,11 +191,10 @@ impl Config {
     
     pub fn get_default_workspace(&self) -> Option<String> {
         // If default_workspace is explicitly set, use it
-        if let Some(ref default) = self.default_workspace {
-            if self.workspace_configs.contains_key(default) {
+        if let Some(ref default) = self.default_workspace
+            && self.workspace_configs.contains_key(default) {
                 return Some(default.clone());
             }
-        }
         
         // If only one workspace exists, use it as default
         if self.workspaces.len() == 1 {

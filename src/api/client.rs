@@ -96,12 +96,11 @@ impl ShortcutApi for ShortcutClient {
             all_stories.extend(search_response.stories.data);
             
             // Check if we have enough stories
-            if let Some(l) = limit {
-                if all_stories.len() >= l {
+            if let Some(l) = limit
+                && all_stories.len() >= l {
                     all_stories.truncate(l);
                     break;
                 }
-            }
             
             // Check if we have a next page
             next_token = search_response.next.or(search_response.stories.next);

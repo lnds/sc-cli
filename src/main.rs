@@ -797,9 +797,9 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
-        if crossterm::event::poll(std::time::Duration::from_millis(50))? {
-            if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
-                if key.kind == crossterm::event::KeyEventKind::Press {
+        if crossterm::event::poll(std::time::Duration::from_millis(50))?
+            && let crossterm::event::Event::Key(key) = crossterm::event::read()?
+                && key.kind == crossterm::event::KeyEventKind::Press {
                     // Special handling for Enter in state selector
                     if app.show_state_selector && key.code == crossterm::event::KeyCode::Enter {
                         let story_update = app.get_selected_story().map(|story| {
@@ -825,8 +825,6 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
                         app.handle_key_event(key)?;
                     }
                 }
-            }
-        }
 
         // Check if we need to handle ownership change
         if app.take_ownership_requested {
@@ -1203,25 +1201,21 @@ fn update_story_state(app: &mut App, story_id: i64, updated_story: api::Story) {
         .push(updated_story);
 
     // If we removed from the current column and it's now empty, reset selected_row
-    if let Some(old_id) = old_state_id {
-        if app.workflow_states.get(app.selected_column).map(|(id, _)| *id) == Some(old_id) {
-            if let Some(stories) = app.stories_by_state.get(&old_id) {
-                if stories.is_empty() || app.selected_row >= stories.len() {
+    if let Some(old_id) = old_state_id
+        && app.workflow_states.get(app.selected_column).map(|(id, _)| *id) == Some(old_id)
+            && let Some(stories) = app.stories_by_state.get(&old_id)
+                && (stories.is_empty() || app.selected_row >= stories.len()) {
                     app.selected_row = 0;
                 }
-            }
-        }
-    }
 }
 
 fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Story) {
     // Find and update the story in its current state
     let state_id = updated_story.workflow_state_id;
-    if let Some(stories) = app.stories_by_state.get_mut(&state_id) {
-        if let Some(pos) = stories.iter().position(|s| s.id == story_id) {
+    if let Some(stories) = app.stories_by_state.get_mut(&state_id)
+        && let Some(pos) = stories.iter().position(|s| s.id == story_id) {
             stories[pos] = updated_story.clone();
         }
-    }
     
     // Also update the story in the all_stories_list for list view
     if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {
@@ -1232,11 +1226,10 @@ fn update_story_ownership(app: &mut App, story_id: i64, updated_story: api::Stor
 fn update_story_details(app: &mut App, story_id: i64, updated_story: api::Story) {
     // Find and update the story in its current state
     let state_id = updated_story.workflow_state_id;
-    if let Some(stories) = app.stories_by_state.get_mut(&state_id) {
-        if let Some(pos) = stories.iter().position(|s| s.id == story_id) {
+    if let Some(stories) = app.stories_by_state.get_mut(&state_id)
+        && let Some(pos) = stories.iter().position(|s| s.id == story_id) {
             stories[pos] = updated_story.clone();
         }
-    }
     
     // Also update the story in the all_stories_list for list view
     if let Some(pos) = app.all_stories_list.iter().position(|s| s.id == story_id) {

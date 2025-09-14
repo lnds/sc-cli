@@ -338,12 +338,11 @@ impl App {
         // Find the first column (workflow state) that contains stories
         let mut selected_column = 0;
         for (index, (state_id, _)) in workflow_states.iter().enumerate() {
-            if let Some(stories) = stories_by_state.get(state_id) {
-                if !stories.is_empty() {
+            if let Some(stories) = stories_by_state.get(state_id)
+                && !stories.is_empty() {
                     selected_column = index;
                     break;
                 }
-            }
         }
 
         let total_stories = filtered_stories.len();
@@ -500,11 +499,10 @@ impl App {
             }
             
             let state_id = self.workflow_states[self.selected_column].0;
-            if let Some(stories) = self.stories_by_state.get(&state_id) {
-                if !stories.is_empty() {
+            if let Some(stories) = self.stories_by_state.get(&state_id)
+                && !stories.is_empty() {
                     self.selected_row = (self.selected_row + 1) % stories.len();
                 }
-            }
         }
     }
 
@@ -526,15 +524,14 @@ impl App {
             }
             
             let state_id = self.workflow_states[self.selected_column].0;
-            if let Some(stories) = self.stories_by_state.get(&state_id) {
-                if !stories.is_empty() {
+            if let Some(stories) = self.stories_by_state.get(&state_id)
+                && !stories.is_empty() {
                     if self.selected_row == 0 {
                         self.selected_row = stories.len() - 1;
                     } else {
                         self.selected_row -= 1;
                     }
                 }
-            }
         }
     }
     
@@ -559,15 +556,14 @@ impl App {
     pub fn toggle_detail(&mut self) {
         if !self.workflow_states.is_empty() {
             let state_id = self.workflow_states[self.selected_column].0;
-            if let Some(stories) = self.stories_by_state.get(&state_id) {
-                if !stories.is_empty() {
+            if let Some(stories) = self.stories_by_state.get(&state_id)
+                && !stories.is_empty() {
                     self.show_detail = !self.show_detail;
                     // Reset scroll offset when opening detail view
                     if self.show_detail {
                         self.detail_scroll_offset = 0;
                     }
                 }
-            }
         }
     }
     
@@ -590,12 +586,11 @@ impl App {
     pub fn toggle_state_selector(&mut self) {
         if !self.workflow_states.is_empty() {
             let state_id = self.workflow_states[self.selected_column].0;
-            if let Some(stories) = self.stories_by_state.get(&state_id) {
-                if !stories.is_empty() {
+            if let Some(stories) = self.stories_by_state.get(&state_id)
+                && !stories.is_empty() {
                     self.show_state_selector = true;
                     self.state_selector_index = 0;
                 }
-            }
         }
     }
 
@@ -1022,8 +1017,8 @@ impl App {
                 }
                 KeyCode::Char('g') => {
                     // Create git branch for selected story
-                    if self.git_context.is_git_repo() {
-                        if let Some(story) = self.get_selected_story().cloned() {
+                    if self.git_context.is_git_repo()
+                        && let Some(story) = self.get_selected_story().cloned() {
                             // Use the formatted VCS branch name from Shortcut if available, otherwise generate one
                             let suggested_branch = story.formatted_vcs_branch_name.unwrap_or_else(|| {
                                 format!("sc-{}-{}", story.id, 
@@ -1042,7 +1037,7 @@ impl App {
                                     let mut textarea = TextArea::default();
                                     textarea.set_cursor_line_style(Style::default());
                                     textarea.set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
-                                    textarea.insert_str(&crate::git::generate_worktree_path(&suggested_branch));
+                                    textarea.insert_str(crate::git::generate_worktree_path(&suggested_branch));
                                     textarea
                                 },
                                 selected_option: if self.git_context.is_bare_repo() { 
@@ -1055,7 +1050,6 @@ impl App {
                                 editing_worktree_path: false,
                             };
                         }
-                    }
                 }
                 _ => {}
             }
@@ -1346,18 +1340,16 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     frame.render_widget(footer, chunks[2]);
 
     // Detail popup
-    if app.show_detail {
-        if let Some(story) = app.get_selected_story() {
+    if app.show_detail
+        && let Some(story) = app.get_selected_story() {
             draw_detail_popup(frame, story, app);
         }
-    }
 
     // State selector popup
-    if app.show_state_selector {
-        if let Some(story) = app.get_selected_story() {
+    if app.show_state_selector
+        && let Some(story) = app.get_selected_story() {
             draw_state_selector_popup(frame, story, app);
         }
-    }
     
     // Create story popup
     if app.show_create_popup {

@@ -120,6 +120,8 @@ pub struct App {
     pub git_branch_requested: bool, // Flag to request git branch creation
     pub show_git_result_popup: bool, // Flag to show git operation result popup
     pub git_result_state: GitResultState, // Git result popup state
+    // Refresh state
+    pub refresh_requested: bool, // Flag to request refreshing all stories
 }
 
 #[derive(Clone)]
@@ -427,6 +429,7 @@ impl App {
                 story_id: 0,
                 selected_option: GitResultOption::Continue,
             },
+            refresh_requested: false,
         }
     }
 
@@ -983,6 +986,10 @@ impl App {
                     // Toggle view mode between columns and list
                     self.toggle_view_mode();
                 }
+                KeyCode::Char('r') => {
+                    // Refresh stories - trigger a reload from the beginning
+                    self.refresh_stories();
+                }
                 KeyCode::Char('g') => {
                     // Create git branch for selected story
                     if self.git_context.is_git_repo() {
@@ -1127,6 +1134,24 @@ impl App {
     pub fn has_more_stories(&self) -> bool {
         self.next_page_token.is_some()
     }
+
+    pub fn refresh_stories(&mut self) {
+        // Set flag to request a refresh
+        self.refresh_requested = true;
+        self.is_loading = true;
+        
+        // Clear existing stories to prepare for fresh data
+        self.stories_by_state.clear();
+        self.all_stories_list.clear();
+        self.total_loaded_stories = 0;
+        self.next_page_token = None;
+        
+        // Reset selection to avoid out-of-bounds issues
+        self.selected_column = 0;
+        self.selected_row = 0;
+        self.list_selected_index = 0;
+        self.list_scroll_offset = 0;
+    }
 }
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
@@ -1160,20 +1185,24 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     } else if app.show_detail {
         "[↑/k] [↓/j] scroll | [Esc] close detail | [q] quit".to_string()
     } else if app.is_loading {
-        format!("Loading more stories... | {} stories loaded", app.total_loaded_stories)
+        if app.refresh_requested {
+            "Refreshing all stories... Please wait...".to_string()
+        } else {
+            format!("Loading more stories... | {} stories loaded", app.total_loaded_stories)
+        }
     } else if app.list_view_mode {
         // List view mode footer
         if app.has_more_stories() {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] column view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] column view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
         } else {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] column view | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] column view | [q] quit | {} stories loaded", app.total_loaded_stories)
         }
     } else {
         // Column view mode footer
         if app.has_more_stories() {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] list view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] list view | [n] load more | [q] quit | {} stories loaded", app.total_loaded_stories)
         } else {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [v] list view | [q] quit | {} stories loaded", app.total_loaded_stories)
+            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [r] refresh | [v] list view | [q] quit | {} stories loaded", app.total_loaded_stories)
         }
     };
     let footer = Paragraph::new(footer_text)

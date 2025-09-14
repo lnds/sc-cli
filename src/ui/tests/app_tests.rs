@@ -349,7 +349,7 @@ mod tests {
             state: crossterm::event::KeyEventState::NONE,
         }).unwrap();
         
-        assert_eq!(app.create_popup_state.name, "T");
+        assert_eq!(app.create_popup_state.name_textarea.lines()[0], "T");
         
         // Test Tab to move to description
         app.handle_key_event(crossterm::event::KeyEvent {

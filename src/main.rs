@@ -1087,8 +1087,43 @@ fn run_app(mut app: App, client: ShortcutClient, workflows: Vec<api::Workflow>, 
             };
         }
 
+        // Check if we need to refresh all stories
+        if app.refresh_requested {
+            // Reset the refresh flag
+            app.refresh_requested = false;
+            
+            // Reload the first page of stories
+            match client.search_stories_page(&app.search_query, None) {
+                Ok(search_result) => {
+                    if debug {
+                        eprintln!("Refreshed with {} stories", search_result.stories.len());
+                    }
+                    
+                    // Create a fresh app instance with the new data
+                    let new_app = App::new(search_result.stories, workflows.clone(), app.search_query.clone(), search_result.next_page_token);
+                    
+                    // Preserve member cache and user ID from the old app
+                    let old_member_cache = app.member_cache.clone();
+                    let old_user_id = app.current_user_id.clone();
+                    
+                    // Replace the app with fresh data
+                    app = new_app;
+                    
+                    // Restore member cache and user ID
+                    app.member_cache = old_member_cache;
+                    app.current_user_id = old_user_id;
+                    
+                    app.is_loading = false;
+                }
+                Err(e) => {
+                    eprintln!("Failed to refresh stories: {e}");
+                    app.is_loading = false;
+                    app.refresh_requested = false;
+                }
+            }
+        }
         // Check if we need to load more stories
-        if app.load_more_requested {
+        else if app.load_more_requested {
             if let Some(ref next_token) = app.next_page_token.clone() {
                 match client.search_stories_page(&app.search_query, Some(next_token.clone())) {
                     Ok(search_result) => {

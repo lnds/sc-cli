@@ -22,7 +22,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
                 position: 1,
             },
             Story {
@@ -40,7 +40,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
                 position: 1,
             },
         ]
@@ -51,9 +51,27 @@ mod tests {
             id: 1,
             name: "Test Workflow".to_string(),
             states: vec![
-                WorkflowState { id: 100, name: "To Do".to_string(), position: 1, color: "#cccccc".to_string(), state_type: "unstarted".to_string() },
-                WorkflowState { id: 200, name: "In Progress".to_string(), position: 2, color: "#0000ff".to_string(), state_type: "started".to_string() },
-                WorkflowState { id: 300, name: "Done".to_string(), position: 3, color: "#00ff00".to_string(), state_type: "done".to_string() },
+                WorkflowState {
+                    id: 100,
+                    name: "To Do".to_string(),
+                    position: 1,
+                    color: "#cccccc".to_string(),
+                    state_type: "unstarted".to_string(),
+                },
+                WorkflowState {
+                    id: 200,
+                    name: "In Progress".to_string(),
+                    position: 2,
+                    color: "#0000ff".to_string(),
+                    state_type: "started".to_string(),
+                },
+                WorkflowState {
+                    id: 300,
+                    name: "Done".to_string(),
+                    position: 3,
+                    color: "#00ff00".to_string(),
+                    state_type: "done".to_string(),
+                },
             ],
         }]
     }
@@ -64,9 +82,14 @@ mod tests {
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
         let next_page_token = Some("next_token_123".to_string());
-        
-        let app = App::new(stories, workflows, search_query.clone(), next_page_token.clone());
-        
+
+        let app = App::new(
+            stories,
+            workflows,
+            search_query.clone(),
+            next_page_token.clone(),
+        );
+
         assert_eq!(app.search_query, search_query);
         assert_eq!(app.next_page_token, next_page_token);
         assert_eq!(app.total_loaded_stories, 2);
@@ -80,9 +103,9 @@ mod tests {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
-        
+
         let app = App::new(stories, workflows, search_query, None);
-        
+
         assert!(!app.has_more_stories());
     }
 
@@ -92,9 +115,9 @@ mod tests {
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
         let next_page_token = Some("next_token_123".to_string());
-        
+
         let mut app = App::new(stories, workflows, search_query, next_page_token);
-        
+
         // Should be able to request load more
         app.request_load_more();
         assert!(app.load_more_requested);
@@ -106,9 +129,9 @@ mod tests {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
-        
+
         let mut app = App::new(stories, workflows, search_query, None);
-        
+
         // Should not request load more when no token
         app.request_load_more();
         assert!(!app.load_more_requested);
@@ -121,12 +144,12 @@ mod tests {
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
         let next_page_token = Some("next_token_123".to_string());
-        
+
         let mut app = App::new(stories, workflows, search_query, next_page_token);
-        
+
         // Set already loading
         app.is_loading = true;
-        
+
         // Should not request load more when already loading
         app.request_load_more();
         assert!(!app.load_more_requested);
@@ -139,25 +162,25 @@ mod tests {
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
         let initial_token = Some("initial_token".to_string());
-        
+
         let mut app = App::new(initial_stories, workflows, search_query, initial_token);
-        
+
         // Simulate requesting load more
         app.load_more_requested = true;
         app.is_loading = true;
-        
+
         // Merge new stories
         let new_stories = vec![create_test_stories()[1].clone()];
         let new_token = Some("new_token".to_string());
-        
+
         app.merge_stories(new_stories, new_token.clone());
-        
+
         // Check state after merge
         assert_eq!(app.total_loaded_stories, 2);
         assert_eq!(app.next_page_token, new_token);
         assert!(!app.is_loading);
         assert!(!app.load_more_requested);
-        
+
         // Check that stories were merged correctly
         assert_eq!(app.stories_by_state.get(&100).unwrap().len(), 1);
         assert_eq!(app.stories_by_state.get(&200).unwrap().len(), 1);
@@ -168,19 +191,19 @@ mod tests {
         let initial_stories = vec![create_test_stories()[0].clone()];
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
-        
+
         let mut app = App::new(initial_stories, workflows, search_query, None);
-        
+
         // Create another story in the same state
         let mut new_story = create_test_stories()[0].clone();
         new_story.id = 3;
         new_story.name = "Test Story 3".to_string();
         new_story.position = 2;
-        
+
         let new_stories = vec![new_story];
-        
+
         app.merge_stories(new_stories, None);
-        
+
         // Check that both stories are in the same state and sorted by position
         let state_100_stories = app.stories_by_state.get(&100).unwrap();
         assert_eq!(state_100_stories.len(), 2);
@@ -194,17 +217,17 @@ mod tests {
         let initial_stories = create_test_stories();
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
-        
+
         let mut app = App::new(initial_stories, workflows, search_query, None);
-        
+
         // Try to merge some of the same stories (should be ignored)
         let duplicate_stories = vec![
             create_test_stories()[0].clone(), // Duplicate of existing story
             create_test_stories()[1].clone(), // Duplicate of existing story
         ];
-        
+
         app.merge_stories(duplicate_stories, None);
-        
+
         // Should still have only 2 unique stories
         assert_eq!(app.total_loaded_stories, 2);
         assert_eq!(app.stories_by_state.get(&100).unwrap().len(), 1);
@@ -216,21 +239,21 @@ mod tests {
         let initial_stories = vec![create_test_stories()[0].clone()];
         let workflows = create_test_workflows();
         let search_query = "owner:test".to_string();
-        
+
         let mut app = App::new(initial_stories, workflows, search_query, None);
-        
+
         // Mix of duplicate and new stories
         let mut new_story = create_test_stories()[0].clone();
         new_story.id = 3; // Make it unique
         new_story.name = "New Unique Story".to_string();
-        
+
         let mixed_stories = vec![
             create_test_stories()[0].clone(), // Duplicate (should be ignored)
             new_story,                        // New (should be added)
         ];
-        
+
         app.merge_stories(mixed_stories, None);
-        
+
         // Should have 2 total stories (1 initial + 1 new, duplicate ignored)
         assert_eq!(app.total_loaded_stories, 2);
         assert_eq!(app.stories_by_state.get(&100).unwrap().len(), 2);

@@ -3,14 +3,14 @@ use crate::git::GitContext;
 use chrono::{DateTime, Datelike, Duration, Utc, Weekday};
 use crossterm::event::{self, KeyCode};
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
-    Frame,
 };
-use tui_textarea::TextArea;
 use std::collections::HashMap;
+use tui_textarea::TextArea;
 
 fn convert_key_to_ratatui(key: crossterm::event::KeyEvent) -> ratatui::crossterm::event::KeyEvent {
     let ratatui_code = match key.code {
@@ -33,7 +33,7 @@ fn convert_key_to_ratatui(key: crossterm::event::KeyEvent) -> ratatui::crossterm
         KeyCode::F(n) => ratatui::crossterm::event::KeyCode::F(n),
         _ => ratatui::crossterm::event::KeyCode::Null,
     };
-    
+
     ratatui::crossterm::event::KeyEvent::from(ratatui_code)
 }
 
@@ -45,7 +45,7 @@ fn is_current_week(date_str: &str) -> bool {
     if let Ok(date) = DateTime::parse_from_rfc3339(date_str) {
         let now = Utc::now();
         let date_utc = date.with_timezone(&Utc);
-        
+
         // Get the start of the current week (Monday)
         let days_since_monday = match now.weekday() {
             Weekday::Mon => 0,
@@ -56,13 +56,17 @@ fn is_current_week(date_str: &str) -> bool {
             Weekday::Sat => 5,
             Weekday::Sun => 6,
         };
-        
+
         let week_start = now - Duration::days(days_since_monday);
-        let week_start = week_start.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
-        
+        let week_start = week_start
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc();
+
         // Get the end of the current week (Sunday)
         let week_end = week_start + Duration::days(7);
-        
+
         date_utc >= week_start && date_utc < week_end
     } else {
         false
@@ -94,8 +98,8 @@ pub struct App {
     pub edit_popup_state: EditPopupState,
     pub workflow_state_map: HashMap<i64, String>,
     pub member_cache: HashMap<String, String>, // owner_id -> name
-    pub current_user_id: Option<String>, // ID of current user
-    pub detail_scroll_offset: usize, // Scroll offset for detail popup
+    pub current_user_id: Option<String>,       // ID of current user
+    pub detail_scroll_offset: usize,           // Scroll offset for detail popup
     pub should_quit: bool,
     pub selected_column: usize,
     pub selected_row: usize,
@@ -108,26 +112,29 @@ pub struct App {
     pub list_selected_index: usize, // Selected story index in list view
     pub list_scroll_offset: usize, // Scroll offset for list view
     // Pagination state
-    pub search_query: String, // Store the current search query
+    pub search_query: String,            // Store the current search query
     pub next_page_token: Option<String>, // Token for the next page
-    pub load_more_requested: bool, // Flag to request loading more stories
-    pub is_loading: bool, // Flag to show loading state
-    pub total_loaded_stories: usize, // Count of total stories loaded
+    pub load_more_requested: bool,       // Flag to request loading more stories
+    pub is_loading: bool,                // Flag to show loading state
+    pub total_loaded_stories: usize,     // Count of total stories loaded
     // Git integration state
-    pub git_context: GitContext, // Git repository context
-    pub show_git_popup: bool, // Flag to show git branch creation popup
+    pub git_context: GitContext,              // Git repository context
+    pub show_git_popup: bool,                 // Flag to show git branch creation popup
     pub git_popup_state: GitBranchPopupState, // Git popup state
-    pub git_branch_requested: bool, // Flag to request git branch creation
-    pub show_git_result_popup: bool, // Flag to show git operation result popup
-    pub git_result_state: GitResultState, // Git result popup state
+    pub git_branch_requested: bool,           // Flag to request git branch creation
+    pub show_git_result_popup: bool,          // Flag to show git operation result popup
+    pub git_result_state: GitResultState,     // Git result popup state
     // Refresh state
     pub refresh_requested: bool, // Flag to request refreshing all stories
     // Epic filtering state
-    pub epics: Vec<Epic>, // List of available epics
-    pub selected_epic_filter: Option<i64>, // Selected epic ID to filter by
-    pub show_epic_selector: bool, // Flag to show epic selector popup
-    pub epic_selector_index: usize, // Selected index in epic selector
+    pub epics: Vec<Epic>,                   // List of available epics
+    pub selected_epic_filter: Option<i64>,  // Selected epic ID to filter by
+    pub show_epic_selector: bool,           // Flag to show epic selector popup
+    pub epic_selector_index: usize,         // Selected index in epic selector
     pub all_stories_unfiltered: Vec<Story>, // Keep unfiltered stories for toggling
+    // Help popup state
+    pub show_help_popup: bool,      // Flag to show help popup
+    pub help_selected_index: usize, // Selected command index in help popup
 }
 
 #[derive(Clone)]
@@ -216,20 +223,12 @@ impl Default for CreatePopupState {
     fn default() -> Self {
         let mut name_textarea = TextArea::default();
         name_textarea.set_cursor_line_style(Style::default());
-        name_textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Name"),
-        );
-        
+        name_textarea.set_block(Block::default().borders(Borders::ALL).title("Name"));
+
         let mut description_textarea = TextArea::default();
         description_textarea.set_cursor_line_style(Style::default());
-        description_textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Description"),
-        );
-        
+        description_textarea.set_block(Block::default().borders(Borders::ALL).title("Description"));
+
         Self {
             name_textarea,
             description_textarea,
@@ -250,25 +249,17 @@ impl EditPopupState {
             "chore" => 2,
             _ => 0,
         };
-        
+
         let mut name_textarea = TextArea::default();
         name_textarea.set_cursor_line_style(Style::default());
-        name_textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Name"),
-        );
+        name_textarea.set_block(Block::default().borders(Borders::ALL).title("Name"));
         name_textarea.insert_str(&story.name);
-        
+
         let mut description_textarea = TextArea::default();
         description_textarea.set_cursor_line_style(Style::default());
-        description_textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Description"),
-        );
+        description_textarea.set_block(Block::default().borders(Borders::ALL).title("Description"));
         description_textarea.insert_str(&story.description);
-        
+
         Self {
             name_textarea,
             description_textarea,
@@ -283,25 +274,33 @@ impl EditPopupState {
 }
 
 impl App {
-    pub fn new(stories: Vec<Story>, workflows: Vec<Workflow>, search_query: String, next_page_token: Option<String>) -> Self {
+    pub fn new(
+        stories: Vec<Story>,
+        workflows: Vec<Workflow>,
+        search_query: String,
+        next_page_token: Option<String>,
+    ) -> Self {
         // Filter stories before grouping by state
-        let filtered_stories = stories.into_iter().filter(|story| {
-            if is_done_state(story.workflow_state_id, &workflows) {
-                // For Done states, only keep stories completed in the current week
-                if let Some(completed_at) = &story.completed_at {
-                    return is_current_week(completed_at);
-                } else if let Some(moved_at) = &story.moved_at {
-                    // Fall back to moved_at if completed_at is not available
-                    return is_current_week(moved_at);
-                } else {
-                    // If no completion date available, use updated_at as fallback
-                    return is_current_week(&story.updated_at);
+        let filtered_stories = stories
+            .into_iter()
+            .filter(|story| {
+                if is_done_state(story.workflow_state_id, &workflows) {
+                    // For Done states, only keep stories completed in the current week
+                    if let Some(completed_at) = &story.completed_at {
+                        return is_current_week(completed_at);
+                    } else if let Some(moved_at) = &story.moved_at {
+                        // Fall back to moved_at if completed_at is not available
+                        return is_current_week(moved_at);
+                    } else {
+                        // If no completion date available, use updated_at as fallback
+                        return is_current_week(&story.updated_at);
+                    }
                 }
-            }
-            // Keep all non-Done stories
-            true
-        }).collect::<Vec<_>>();
-        
+                // Keep all non-Done stories
+                true
+            })
+            .collect::<Vec<_>>();
+
         // Group stories by workflow state
         let mut stories_by_state: HashMap<i64, Vec<Story>> = HashMap::new();
         for story in filtered_stories.iter() {
@@ -310,49 +309,48 @@ impl App {
                 .or_default()
                 .push(story.clone());
         }
-        
+
         // Sort stories within each state by position
         for stories in stories_by_state.values_mut() {
             stories.sort_by_key(|s| s.position);
         }
-        
+
         // Limit Done states to 10 stories maximum
         for (&state_id, stories) in stories_by_state.iter_mut() {
             if is_done_state(state_id, &workflows) && stories.len() > 10 {
                 stories.truncate(10);
             }
         }
-        
+
         // Create workflow state map for quick lookups
         let mut workflow_state_map = HashMap::new();
         let mut state_positions: HashMap<i64, i64> = HashMap::new();
-        
+
         for workflow in workflows.iter() {
             for state in workflow.states.iter() {
                 workflow_state_map.insert(state.id, state.name.clone());
                 state_positions.insert(state.id, state.position);
             }
         }
-        
+
         // Get ordered list of ALL workflow states, sorted by position
         let mut workflow_states: Vec<(i64, String)> = workflow_state_map
             .iter()
             .map(|(&id, name)| (id, name.clone()))
             .collect();
-        
+
         // Sort by position attribute
-        workflow_states.sort_by_key(|(id, _)| {
-            state_positions.get(id).copied().unwrap_or(i64::MAX)
-        });
+        workflow_states.sort_by_key(|(id, _)| state_positions.get(id).copied().unwrap_or(i64::MAX));
 
         // Find the first column (workflow state) that contains stories
         let mut selected_column = 0;
         for (index, (state_id, _)) in workflow_states.iter().enumerate() {
             if let Some(stories) = stories_by_state.get(state_id)
-                && !stories.is_empty() {
-                    selected_column = index;
-                    break;
-                }
+                && !stories.is_empty()
+            {
+                selected_column = index;
+                break;
+            }
         }
 
         let total_stories = filtered_stories.len();
@@ -363,7 +361,7 @@ impl App {
 
         // Keep unfiltered stories for epic filtering
         let all_stories_unfiltered = filtered_stories.clone();
-        
+
         let git_context = GitContext::detect().unwrap_or(GitContext {
             repo_type: crate::git::GitRepoType::NotARepo,
             current_branch: None,
@@ -430,7 +428,11 @@ impl App {
                 worktree_path_textarea: {
                     let mut textarea = TextArea::default();
                     textarea.set_cursor_line_style(Style::default());
-                    textarea.set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
+                    textarea.set_block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title("Worktree Path"),
+                    );
                     textarea
                 },
                 selected_option: GitBranchOption::CreateBranch,
@@ -455,6 +457,8 @@ impl App {
             show_epic_selector: false,
             epic_selector_index: 0,
             all_stories_unfiltered,
+            show_help_popup: false,
+            help_selected_index: 0,
         }
     }
 
@@ -501,7 +505,8 @@ impl App {
         if self.list_view_mode {
             // List view navigation
             if !self.all_stories_list.is_empty() {
-                self.list_selected_index = (self.list_selected_index + 1) % self.all_stories_list.len();
+                self.list_selected_index =
+                    (self.list_selected_index + 1) % self.all_stories_list.len();
                 // Scroll will be updated in the draw function based on visible area
             }
         } else {
@@ -509,12 +514,13 @@ impl App {
             if self.workflow_states.is_empty() {
                 return;
             }
-            
+
             let state_id = self.workflow_states[self.selected_column].0;
             if let Some(stories) = self.stories_by_state.get(&state_id)
-                && !stories.is_empty() {
-                    self.selected_row = (self.selected_row + 1) % stories.len();
-                }
+                && !stories.is_empty()
+            {
+                self.selected_row = (self.selected_row + 1) % stories.len();
+            }
         }
     }
 
@@ -534,26 +540,27 @@ impl App {
             if self.workflow_states.is_empty() {
                 return;
             }
-            
+
             let state_id = self.workflow_states[self.selected_column].0;
             if let Some(stories) = self.stories_by_state.get(&state_id)
-                && !stories.is_empty() {
-                    if self.selected_row == 0 {
-                        self.selected_row = stories.len() - 1;
-                    } else {
-                        self.selected_row -= 1;
-                    }
+                && !stories.is_empty()
+            {
+                if self.selected_row == 0 {
+                    self.selected_row = stories.len() - 1;
+                } else {
+                    self.selected_row -= 1;
                 }
+            }
         }
     }
-    
+
     pub fn next_column(&mut self) {
         if !self.workflow_states.is_empty() {
             self.selected_column = (self.selected_column + 1) % self.workflow_states.len();
             self.selected_row = 0;
         }
     }
-    
+
     pub fn previous_column(&mut self) {
         if !self.workflow_states.is_empty() {
             if self.selected_column == 0 {
@@ -569,16 +576,17 @@ impl App {
         if !self.workflow_states.is_empty() {
             let state_id = self.workflow_states[self.selected_column].0;
             if let Some(stories) = self.stories_by_state.get(&state_id)
-                && !stories.is_empty() {
-                    self.show_detail = !self.show_detail;
-                    // Reset scroll offset when opening detail view
-                    if self.show_detail {
-                        self.detail_scroll_offset = 0;
-                    }
+                && !stories.is_empty()
+            {
+                self.show_detail = !self.show_detail;
+                // Reset scroll offset when opening detail view
+                if self.show_detail {
+                    self.detail_scroll_offset = 0;
                 }
+            }
         }
     }
-    
+
     pub fn get_selected_story(&self) -> Option<&Story> {
         if self.list_view_mode {
             // List view mode
@@ -588,9 +596,10 @@ impl App {
             if self.workflow_states.is_empty() {
                 return None;
             }
-            
+
             let state_id = self.workflow_states[self.selected_column].0;
-            self.stories_by_state.get(&state_id)
+            self.stories_by_state
+                .get(&state_id)
                 .and_then(|stories| stories.get(self.selected_row))
         }
     }
@@ -599,10 +608,11 @@ impl App {
         if !self.workflow_states.is_empty() {
             let state_id = self.workflow_states[self.selected_column].0;
             if let Some(stories) = self.stories_by_state.get(&state_id)
-                && !stories.is_empty() {
-                    self.show_state_selector = true;
-                    self.state_selector_index = 0;
-                }
+                && !stories.is_empty()
+            {
+                self.show_state_selector = true;
+                self.state_selector_index = 0;
+            }
         }
     }
 
@@ -610,7 +620,8 @@ impl App {
         if let Some(story) = self.get_selected_story() {
             let available_states = self.get_available_states_for_story(story);
             if !available_states.is_empty() {
-                self.state_selector_index = (self.state_selector_index + 1) % available_states.len();
+                self.state_selector_index =
+                    (self.state_selector_index + 1) % available_states.len();
             }
         }
     }
@@ -639,21 +650,161 @@ impl App {
     pub fn get_selected_target_state(&self) -> Option<i64> {
         if let Some(story) = self.get_selected_story() {
             let available_states = self.get_available_states_for_story(story);
-            available_states.get(self.state_selector_index).map(|(id, _)| *id)
+            available_states
+                .get(self.state_selector_index)
+                .map(|(id, _)| *id)
         } else {
             None
         }
     }
 
     pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
-        if self.show_git_result_popup {
+        if self.show_help_popup {
+            // Handle help popup input
+            match key.code {
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('?') => {
+                    self.show_help_popup = false;
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if self.help_selected_index > 0 {
+                        self.help_selected_index -= 1;
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    // Total commands: Navigation(4) + View(5) + Story Actions(5) + Application(2) = 16
+                    let total_commands = 16;
+                    if self.help_selected_index < total_commands - 1 {
+                        self.help_selected_index += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    // Execute the selected command
+                    self.show_help_popup = false;
+
+                    // Map index to command
+                    // Navigation: 0-3, View: 4-8, Story Actions: 9-13, Application: 14-15
+                    match self.help_selected_index {
+                        // Navigation
+                        0 => {} // Up - no action, just informational
+                        1 => {} // Down - no action, just informational
+                        2 => {} // Left - no action, just informational
+                        3 => {} // Right - no action, just informational
+                        // View
+                        4 => {
+                            // Enter - Show story details
+                            if !self.show_detail && self.get_selected_story().is_some() {
+                                self.toggle_detail();
+                            }
+                        }
+                        5 => self.toggle_view_mode(), // v - Toggle view
+                        6 => self.toggle_epic_selector(), // f - Filter by epic
+                        7 => self.refresh_stories(),  // r - Refresh
+                        8 => {
+                            // n - Load more stories
+                            if self.has_more_stories() {
+                                self.request_load_more();
+                            }
+                        }
+                        // Story Actions
+                        9 => {
+                            // Space - Move story
+                            if self.get_selected_story().is_some() {
+                                self.toggle_state_selector();
+                            }
+                        }
+                        10 => self.take_ownership_requested = true, // o - Take ownership
+                        11 => {
+                            // e - Edit story
+                            if let Some(story) = self.get_selected_story().cloned() {
+                                self.show_edit_popup = true;
+                                self.edit_popup_state = EditPopupState::from_story(&story);
+                            }
+                        }
+                        12 => {
+                            // a - Add story
+                            self.show_create_popup = true;
+                            self.create_popup_state = CreatePopupState::default();
+                        }
+                        13 => {
+                            // g - Create git branch
+                            if self.git_context.is_git_repo()
+                                && let Some(story) = self.get_selected_story().cloned()
+                            {
+                                let suggested_branch =
+                                    story.formatted_vcs_branch_name.unwrap_or_else(|| {
+                                        format!(
+                                            "sc-{}-{}",
+                                            story.id,
+                                            story
+                                                .name
+                                                .to_lowercase()
+                                                .chars()
+                                                .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                                                .collect::<String>()
+                                                .split('-')
+                                                .filter(|s| !s.is_empty())
+                                                .take(5)
+                                                .collect::<Vec<_>>()
+                                                .join("-")
+                                        )
+                                    });
+                                self.show_git_popup = true;
+                                self.git_popup_state = GitBranchPopupState {
+                                    branch_name_textarea: {
+                                        let mut textarea = TextArea::default();
+                                        textarea.set_cursor_line_style(Style::default());
+                                        textarea.set_block(
+                                            Block::default()
+                                                .borders(Borders::ALL)
+                                                .title("Branch Name"),
+                                        );
+                                        textarea.insert_str(&suggested_branch);
+                                        textarea
+                                    },
+                                    worktree_path_textarea: {
+                                        let mut textarea = TextArea::default();
+                                        textarea.set_cursor_line_style(Style::default());
+                                        textarea.set_block(
+                                            Block::default()
+                                                .borders(Borders::ALL)
+                                                .title("Worktree Path"),
+                                        );
+                                        textarea.insert_str(crate::git::generate_worktree_path(
+                                            &suggested_branch,
+                                        ));
+                                        textarea
+                                    },
+                                    selected_option: if self.git_context.is_bare_repo() {
+                                        GitBranchOption::CreateWorktree
+                                    } else {
+                                        GitBranchOption::CreateBranch
+                                    },
+                                    story_id: story.id,
+                                    editing_branch_name: false,
+                                    editing_worktree_path: false,
+                                };
+                            }
+                        }
+                        // Application
+                        14 => {}                       // ? - Help (already closed)
+                        15 => self.should_quit = true, // q - Quit
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        } else if self.show_git_result_popup {
             // Handle git result popup input
             match key.code {
                 KeyCode::Esc | KeyCode::Enter => {
-                    if self.git_result_state.selected_option == GitResultOption::Continue || key.code == KeyCode::Esc {
+                    if self.git_result_state.selected_option == GitResultOption::Continue
+                        || key.code == KeyCode::Esc
+                    {
                         // Just close the popup
                         self.show_git_result_popup = false;
-                    } else if self.git_result_state.selected_option == GitResultOption::ExitAndChange {
+                    } else if self.git_result_state.selected_option
+                        == GitResultOption::ExitAndChange
+                    {
                         // Exit and change to worktree directory
                         if let Some(ref worktree_path) = self.git_result_state.worktree_path {
                             // Set flag to exit the application and change directory
@@ -665,21 +816,27 @@ impl App {
                     }
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
-                    if self.git_result_state.worktree_path.is_some() && self.git_result_state.success {
+                    if self.git_result_state.worktree_path.is_some()
+                        && self.git_result_state.success
+                    {
                         // Toggle between Continue and ExitAndChange
-                        self.git_result_state.selected_option = match self.git_result_state.selected_option {
-                            GitResultOption::Continue => GitResultOption::ExitAndChange,
-                            GitResultOption::ExitAndChange => GitResultOption::Continue,
-                        };
+                        self.git_result_state.selected_option =
+                            match self.git_result_state.selected_option {
+                                GitResultOption::Continue => GitResultOption::ExitAndChange,
+                                GitResultOption::ExitAndChange => GitResultOption::Continue,
+                            };
                     }
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    if self.git_result_state.worktree_path.is_some() && self.git_result_state.success {
+                    if self.git_result_state.worktree_path.is_some()
+                        && self.git_result_state.success
+                    {
                         // Toggle between Continue and ExitAndChange
-                        self.git_result_state.selected_option = match self.git_result_state.selected_option {
-                            GitResultOption::Continue => GitResultOption::ExitAndChange,
-                            GitResultOption::ExitAndChange => GitResultOption::Continue,
-                        };
+                        self.git_result_state.selected_option =
+                            match self.git_result_state.selected_option {
+                                GitResultOption::Continue => GitResultOption::ExitAndChange,
+                                GitResultOption::ExitAndChange => GitResultOption::Continue,
+                            };
                     }
                 }
                 _ => {}
@@ -695,13 +852,20 @@ impl App {
                     KeyCode::Enter => {
                         self.git_popup_state.editing_branch_name = false;
                         // Update worktree path when branch name changes
-                        let branch_name = self.git_popup_state.branch_name_textarea.lines().join("");
+                        let branch_name =
+                            self.git_popup_state.branch_name_textarea.lines().join("");
                         let worktree_path = crate::git::generate_worktree_path(&branch_name);
-                        self.git_popup_state.worktree_path_textarea.delete_line_by_head();
-                        self.git_popup_state.worktree_path_textarea.insert_str(&worktree_path);
+                        self.git_popup_state
+                            .worktree_path_textarea
+                            .delete_line_by_head();
+                        self.git_popup_state
+                            .worktree_path_textarea
+                            .insert_str(&worktree_path);
                     }
                     _ => {
-                        self.git_popup_state.branch_name_textarea.input(convert_key_to_ratatui(key));
+                        self.git_popup_state
+                            .branch_name_textarea
+                            .input(convert_key_to_ratatui(key));
                     }
                 }
             } else if self.git_popup_state.editing_worktree_path {
@@ -714,7 +878,9 @@ impl App {
                         self.git_popup_state.editing_worktree_path = false;
                     }
                     _ => {
-                        self.git_popup_state.worktree_path_textarea.input(convert_key_to_ratatui(key));
+                        self.git_popup_state
+                            .worktree_path_textarea
+                            .input(convert_key_to_ratatui(key));
                     }
                 }
             } else {
@@ -726,13 +892,19 @@ impl App {
                             branch_name_textarea: {
                                 let mut textarea = TextArea::default();
                                 textarea.set_cursor_line_style(Style::default());
-                                textarea.set_block(Block::default().borders(Borders::ALL).title("Branch Name"));
+                                textarea.set_block(
+                                    Block::default().borders(Borders::ALL).title("Branch Name"),
+                                );
                                 textarea
                             },
                             worktree_path_textarea: {
                                 let mut textarea = TextArea::default();
                                 textarea.set_cursor_line_style(Style::default());
-                                textarea.set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
+                                textarea.set_block(
+                                    Block::default()
+                                        .borders(Borders::ALL)
+                                        .title("Worktree Path"),
+                                );
                                 textarea
                             },
                             selected_option: GitBranchOption::CreateBranch,
@@ -741,17 +913,15 @@ impl App {
                             editing_worktree_path: false,
                         };
                     }
-                    KeyCode::Enter => {
-                        match self.git_popup_state.selected_option {
-                            GitBranchOption::CreateBranch | GitBranchOption::CreateWorktree => {
-                                self.git_branch_requested = true;
-                                self.show_git_popup = false;
-                            }
-                            GitBranchOption::Cancel => {
-                                self.show_git_popup = false;
-                            }
+                    KeyCode::Enter => match self.git_popup_state.selected_option {
+                        GitBranchOption::CreateBranch | GitBranchOption::CreateWorktree => {
+                            self.git_branch_requested = true;
+                            self.show_git_popup = false;
                         }
-                    }
+                        GitBranchOption::Cancel => {
+                            self.show_git_popup = false;
+                        }
+                    },
                     KeyCode::Tab | KeyCode::Char('e') => {
                         // Enter branch name editing mode
                         self.git_popup_state.editing_branch_name = true;
@@ -763,44 +933,49 @@ impl App {
                         }
                     }
                     KeyCode::Up | KeyCode::Char('k') => {
-                    match self.git_popup_state.selected_option {
-                        GitBranchOption::CreateBranch => {
-                            self.git_popup_state.selected_option = GitBranchOption::Cancel;
-                        }
-                        GitBranchOption::CreateWorktree => {
-                            // CreateWorktree is only available in bare repos, so always go to Cancel
-                            self.git_popup_state.selected_option = GitBranchOption::Cancel;
-                        }
-                        GitBranchOption::Cancel => {
-                            if self.git_context.is_bare_repo() {
-                                self.git_popup_state.selected_option = GitBranchOption::CreateWorktree;
-                            } else {
-                                self.git_popup_state.selected_option = GitBranchOption::CreateBranch;
-                            }
-                        }
-                    }
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    match self.git_popup_state.selected_option {
-                        GitBranchOption::CreateBranch => {
-                            if self.git_context.is_bare_repo() {
-                                self.git_popup_state.selected_option = GitBranchOption::CreateWorktree;
-                            } else {
+                        match self.git_popup_state.selected_option {
+                            GitBranchOption::CreateBranch => {
                                 self.git_popup_state.selected_option = GitBranchOption::Cancel;
                             }
-                        }
-                        GitBranchOption::CreateWorktree => {
-                            self.git_popup_state.selected_option = GitBranchOption::Cancel;
-                        }
-                        GitBranchOption::Cancel => {
-                            if self.git_context.is_bare_repo() {
-                                self.git_popup_state.selected_option = GitBranchOption::CreateWorktree;
-                            } else {
-                                self.git_popup_state.selected_option = GitBranchOption::CreateBranch;
+                            GitBranchOption::CreateWorktree => {
+                                // CreateWorktree is only available in bare repos, so always go to Cancel
+                                self.git_popup_state.selected_option = GitBranchOption::Cancel;
+                            }
+                            GitBranchOption::Cancel => {
+                                if self.git_context.is_bare_repo() {
+                                    self.git_popup_state.selected_option =
+                                        GitBranchOption::CreateWorktree;
+                                } else {
+                                    self.git_popup_state.selected_option =
+                                        GitBranchOption::CreateBranch;
+                                }
                             }
                         }
                     }
-                }
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        match self.git_popup_state.selected_option {
+                            GitBranchOption::CreateBranch => {
+                                if self.git_context.is_bare_repo() {
+                                    self.git_popup_state.selected_option =
+                                        GitBranchOption::CreateWorktree;
+                                } else {
+                                    self.git_popup_state.selected_option = GitBranchOption::Cancel;
+                                }
+                            }
+                            GitBranchOption::CreateWorktree => {
+                                self.git_popup_state.selected_option = GitBranchOption::Cancel;
+                            }
+                            GitBranchOption::Cancel => {
+                                if self.git_context.is_bare_repo() {
+                                    self.git_popup_state.selected_option =
+                                        GitBranchOption::CreateWorktree;
+                                } else {
+                                    self.git_popup_state.selected_option =
+                                        GitBranchOption::CreateBranch;
+                                }
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -825,13 +1000,16 @@ impl App {
                         name_textarea: {
                             let mut textarea = TextArea::default();
                             textarea.set_cursor_line_style(Style::default());
-                            textarea.set_block(Block::default().borders(Borders::ALL).title("Name"));
+                            textarea
+                                .set_block(Block::default().borders(Borders::ALL).title("Name"));
                             textarea
                         },
                         description_textarea: {
                             let mut textarea = TextArea::default();
                             textarea.set_cursor_line_style(Style::default());
-                            textarea.set_block(Block::default().borders(Borders::ALL).title("Description"));
+                            textarea.set_block(
+                                Block::default().borders(Borders::ALL).title("Description"),
+                            );
                             textarea
                         },
                         story_type: "feature".to_string(),
@@ -844,47 +1022,61 @@ impl App {
                 }
                 KeyCode::Tab => {
                     // Move to next field
-                    self.edit_popup_state.selected_field = match self.edit_popup_state.selected_field {
-                        EditField::Name => EditField::Description,
-                        EditField::Description => EditField::Type,
-                        EditField::Type => EditField::Epic,
-                        EditField::Epic => EditField::Name,
-                    };
+                    self.edit_popup_state.selected_field =
+                        match self.edit_popup_state.selected_field {
+                            EditField::Name => EditField::Description,
+                            EditField::Description => EditField::Type,
+                            EditField::Type => EditField::Epic,
+                            EditField::Epic => EditField::Name,
+                        };
                 }
                 KeyCode::Enter => {
                     if self.edit_popup_state.selected_field == EditField::Epic {
                         // Submit the story edit
-                        if !self.edit_popup_state.name_textarea.lines().join("").trim().is_empty() {
+                        if !self
+                            .edit_popup_state
+                            .name_textarea
+                            .lines()
+                            .join("")
+                            .trim()
+                            .is_empty()
+                        {
                             self.edit_story_requested = true;
                             self.show_edit_popup = false;
                         }
                     } else {
                         // Move to next field on Enter
-                        self.edit_popup_state.selected_field = match self.edit_popup_state.selected_field {
-                            EditField::Name => EditField::Description,
-                            EditField::Description => EditField::Type,
-                            EditField::Type => EditField::Epic,
-                            EditField::Epic => EditField::Epic,
-                        };
+                        self.edit_popup_state.selected_field =
+                            match self.edit_popup_state.selected_field {
+                                EditField::Name => EditField::Description,
+                                EditField::Description => EditField::Type,
+                                EditField::Type => EditField::Epic,
+                                EditField::Epic => EditField::Epic,
+                            };
                     }
                 }
-                KeyCode::Up | KeyCode::Down if self.edit_popup_state.selected_field == EditField::Type => {
+                KeyCode::Up | KeyCode::Down
+                    if self.edit_popup_state.selected_field == EditField::Type =>
+                {
                     // Cycle through story types
                     let types = ["feature", "bug", "chore"];
                     if key.code == KeyCode::Down {
-                        self.edit_popup_state.story_type_index = 
+                        self.edit_popup_state.story_type_index =
                             (self.edit_popup_state.story_type_index + 1) % types.len();
                     } else {
-                        self.edit_popup_state.story_type_index = 
-                            if self.edit_popup_state.story_type_index == 0 { 
-                                types.len() - 1 
-                            } else { 
-                                self.edit_popup_state.story_type_index - 1 
+                        self.edit_popup_state.story_type_index =
+                            if self.edit_popup_state.story_type_index == 0 {
+                                types.len() - 1
+                            } else {
+                                self.edit_popup_state.story_type_index - 1
                             };
                     }
-                    self.edit_popup_state.story_type = types[self.edit_popup_state.story_type_index].to_string();
+                    self.edit_popup_state.story_type =
+                        types[self.edit_popup_state.story_type_index].to_string();
                 }
-                KeyCode::Up | KeyCode::Down if self.edit_popup_state.selected_field == EditField::Epic => {
+                KeyCode::Up | KeyCode::Down
+                    if self.edit_popup_state.selected_field == EditField::Epic =>
+                {
                     // Cycle through epics (including None option)
                     let epic_count = self.epics.len() + 1; // +1 for None option
                     if key.code == KeyCode::Down {
@@ -899,22 +1091,27 @@ impl App {
                             };
                     }
                     // Update epic_id based on selection
-                    self.edit_popup_state.epic_id = if self.edit_popup_state.epic_selector_index == 0 {
-                        None
-                    } else if self.edit_popup_state.epic_selector_index <= self.epics.len() {
-                        Some(self.epics[self.edit_popup_state.epic_selector_index - 1].id)
-                    } else {
-                        None
-                    };
+                    self.edit_popup_state.epic_id =
+                        if self.edit_popup_state.epic_selector_index == 0 {
+                            None
+                        } else if self.edit_popup_state.epic_selector_index <= self.epics.len() {
+                            Some(self.epics[self.edit_popup_state.epic_selector_index - 1].id)
+                        } else {
+                            None
+                        };
                 }
                 _ => {
                     // Handle text input for TextArea widgets
                     match self.edit_popup_state.selected_field {
                         EditField::Name => {
-                            self.edit_popup_state.name_textarea.input(convert_key_to_ratatui(key));
+                            self.edit_popup_state
+                                .name_textarea
+                                .input(convert_key_to_ratatui(key));
                         }
                         EditField::Description => {
-                            self.edit_popup_state.description_textarea.input(convert_key_to_ratatui(key));
+                            self.edit_popup_state
+                                .description_textarea
+                                .input(convert_key_to_ratatui(key));
                         }
                         EditField::Type => {}
                         EditField::Epic => {}
@@ -930,31 +1127,42 @@ impl App {
                 }
                 KeyCode::Tab => {
                     // Move to next field
-                    self.create_popup_state.selected_field = match self.create_popup_state.selected_field {
-                        CreateField::Name => CreateField::Description,
-                        CreateField::Description => CreateField::Type,
-                        CreateField::Type => CreateField::Epic,
-                        CreateField::Epic => CreateField::Name,
-                    };
+                    self.create_popup_state.selected_field =
+                        match self.create_popup_state.selected_field {
+                            CreateField::Name => CreateField::Description,
+                            CreateField::Description => CreateField::Type,
+                            CreateField::Type => CreateField::Epic,
+                            CreateField::Epic => CreateField::Name,
+                        };
                 }
                 KeyCode::Enter => {
                     if self.create_popup_state.selected_field == CreateField::Epic {
                         // Submit the story
-                        if !self.create_popup_state.name_textarea.lines().join("").trim().is_empty() {
+                        if !self
+                            .create_popup_state
+                            .name_textarea
+                            .lines()
+                            .join("")
+                            .trim()
+                            .is_empty()
+                        {
                             self.create_story_requested = true;
                             self.show_create_popup = false;
                         }
                     } else {
                         // Move to next field on Enter
-                        self.create_popup_state.selected_field = match self.create_popup_state.selected_field {
-                            CreateField::Name => CreateField::Description,
-                            CreateField::Description => CreateField::Type,
-                            CreateField::Type => CreateField::Epic,
-                            CreateField::Epic => CreateField::Epic,
-                        };
+                        self.create_popup_state.selected_field =
+                            match self.create_popup_state.selected_field {
+                                CreateField::Name => CreateField::Description,
+                                CreateField::Description => CreateField::Type,
+                                CreateField::Type => CreateField::Epic,
+                                CreateField::Epic => CreateField::Epic,
+                            };
                     }
                 }
-                KeyCode::Up | KeyCode::Down if self.create_popup_state.selected_field == CreateField::Type => {
+                KeyCode::Up | KeyCode::Down
+                    if self.create_popup_state.selected_field == CreateField::Type =>
+                {
                     // Cycle through story types
                     let types = ["feature", "bug", "chore"];
                     if key.code == KeyCode::Down {
@@ -968,9 +1176,12 @@ impl App {
                                 self.create_popup_state.story_type_index - 1
                             };
                     }
-                    self.create_popup_state.story_type = types[self.create_popup_state.story_type_index].to_string();
+                    self.create_popup_state.story_type =
+                        types[self.create_popup_state.story_type_index].to_string();
                 }
-                KeyCode::Up | KeyCode::Down if self.create_popup_state.selected_field == CreateField::Epic => {
+                KeyCode::Up | KeyCode::Down
+                    if self.create_popup_state.selected_field == CreateField::Epic =>
+                {
                     // Cycle through epics (including None option)
                     let epic_count = self.epics.len() + 1; // +1 for None option
                     if key.code == KeyCode::Down {
@@ -985,22 +1196,27 @@ impl App {
                             };
                     }
                     // Update epic_id based on selection
-                    self.create_popup_state.epic_id = if self.create_popup_state.epic_selector_index == 0 {
-                        None
-                    } else if self.create_popup_state.epic_selector_index <= self.epics.len() {
-                        Some(self.epics[self.create_popup_state.epic_selector_index - 1].id)
-                    } else {
-                        None
-                    };
+                    self.create_popup_state.epic_id =
+                        if self.create_popup_state.epic_selector_index == 0 {
+                            None
+                        } else if self.create_popup_state.epic_selector_index <= self.epics.len() {
+                            Some(self.epics[self.create_popup_state.epic_selector_index - 1].id)
+                        } else {
+                            None
+                        };
                 }
                 _ => {
                     // Handle text input for TextArea widgets
                     match self.create_popup_state.selected_field {
                         CreateField::Name => {
-                            self.create_popup_state.name_textarea.input(convert_key_to_ratatui(key));
+                            self.create_popup_state
+                                .name_textarea
+                                .input(convert_key_to_ratatui(key));
                         }
                         CreateField::Description => {
-                            self.create_popup_state.description_textarea.input(convert_key_to_ratatui(key));
+                            self.create_popup_state
+                                .description_textarea
+                                .input(convert_key_to_ratatui(key));
                         }
                         CreateField::Type => {}
                         CreateField::Epic => {}
@@ -1041,12 +1257,12 @@ impl App {
                     if !self.list_view_mode {
                         self.next_column();
                     }
-                },
+                }
                 KeyCode::Char('h') | KeyCode::Left => {
                     if !self.list_view_mode {
                         self.previous_column();
                     }
-                },
+                }
                 KeyCode::Enter => self.toggle_detail(),
                 KeyCode::Char(' ') => self.toggle_state_selector(),
                 KeyCode::Char('o') => {
@@ -1064,11 +1280,16 @@ impl App {
                         self.show_edit_popup = true;
                         self.edit_popup_state = EditPopupState::from_story(&story);
                         // Set the epic selector index based on current epic
-                        self.edit_popup_state.epic_selector_index = if let Some(epic_id) = story.epic_id {
-                            self.epics.iter().position(|e| e.id == epic_id).map(|i| i + 1).unwrap_or(0)
-                        } else {
-                            0 // None selected
-                        };
+                        self.edit_popup_state.epic_selector_index =
+                            if let Some(epic_id) = story.epic_id {
+                                self.epics
+                                    .iter()
+                                    .position(|e| e.id == epic_id)
+                                    .map(|i| i + 1)
+                                    .unwrap_or(0)
+                            } else {
+                                0 // None selected
+                            };
                     }
                 }
                 KeyCode::Char('n') => {
@@ -1087,41 +1308,59 @@ impl App {
                     // Toggle epic filter selector
                     self.toggle_epic_selector();
                 }
+                KeyCode::Char('?') => {
+                    // Show help popup
+                    self.show_help_popup = true;
+                    self.help_selected_index = 0;
+                }
                 KeyCode::Char('g') => {
                     // Create git branch for selected story
                     if self.git_context.is_git_repo()
-                        && let Some(story) = self.get_selected_story().cloned() {
-                            // Use the formatted VCS branch name from Shortcut if available, otherwise generate one
-                            let suggested_branch = story.formatted_vcs_branch_name.unwrap_or_else(|| {
-                                format!("sc-{}-{}", story.id, 
-                                    story.name.replace([' ', '/'], "-").to_lowercase())
+                        && let Some(story) = self.get_selected_story().cloned()
+                    {
+                        // Use the formatted VCS branch name from Shortcut if available, otherwise generate one
+                        let suggested_branch =
+                            story.formatted_vcs_branch_name.unwrap_or_else(|| {
+                                format!(
+                                    "sc-{}-{}",
+                                    story.id,
+                                    story.name.replace([' ', '/'], "-").to_lowercase()
+                                )
                             });
-                            self.show_git_popup = true;
-                            self.git_popup_state = GitBranchPopupState {
-                                branch_name_textarea: {
-                                    let mut textarea = TextArea::default();
-                                    textarea.set_cursor_line_style(Style::default());
-                                    textarea.set_block(Block::default().borders(Borders::ALL).title("Branch Name"));
-                                    textarea.insert_str(&suggested_branch);
-                                    textarea
-                                },
-                                worktree_path_textarea: {
-                                    let mut textarea = TextArea::default();
-                                    textarea.set_cursor_line_style(Style::default());
-                                    textarea.set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
-                                    textarea.insert_str(crate::git::generate_worktree_path(&suggested_branch));
-                                    textarea
-                                },
-                                selected_option: if self.git_context.is_bare_repo() { 
-                                    GitBranchOption::CreateWorktree 
-                                } else { 
-                                    GitBranchOption::CreateBranch 
-                                },
-                                story_id: story.id,
-                                editing_branch_name: false,
-                                editing_worktree_path: false,
-                            };
-                        }
+                        self.show_git_popup = true;
+                        self.git_popup_state = GitBranchPopupState {
+                            branch_name_textarea: {
+                                let mut textarea = TextArea::default();
+                                textarea.set_cursor_line_style(Style::default());
+                                textarea.set_block(
+                                    Block::default().borders(Borders::ALL).title("Branch Name"),
+                                );
+                                textarea.insert_str(&suggested_branch);
+                                textarea
+                            },
+                            worktree_path_textarea: {
+                                let mut textarea = TextArea::default();
+                                textarea.set_cursor_line_style(Style::default());
+                                textarea.set_block(
+                                    Block::default()
+                                        .borders(Borders::ALL)
+                                        .title("Worktree Path"),
+                                );
+                                textarea.insert_str(crate::git::generate_worktree_path(
+                                    &suggested_branch,
+                                ));
+                                textarea
+                            },
+                            selected_option: if self.git_context.is_bare_repo() {
+                                GitBranchOption::CreateWorktree
+                            } else {
+                                GitBranchOption::CreateBranch
+                            },
+                            story_id: story.id,
+                            editing_branch_name: false,
+                            editing_worktree_path: false,
+                        };
+                    }
                 }
                 _ => {}
             }
@@ -1130,18 +1369,16 @@ impl App {
     }
 
     pub fn get_owner_names(&self, owner_ids: &[String]) -> Vec<String> {
-        owner_ids.iter()
+        owner_ids
+            .iter()
             .map(|id| {
-                
-                self.member_cache.get(id)
-                    .cloned()
-                    .unwrap_or_else(|| {
-                        // If debug mode, log cache miss
-                        if std::env::var("RUST_LOG").is_ok() {
-                            eprintln!("Cache miss for owner ID: {id}");
-                        }
-                        id.clone()
-                    })
+                self.member_cache.get(id).cloned().unwrap_or_else(|| {
+                    // If debug mode, log cache miss
+                    if std::env::var("RUST_LOG").is_ok() {
+                        eprintln!("Cache miss for owner ID: {id}");
+                    }
+                    id.clone()
+                })
             })
             .collect()
     }
@@ -1161,28 +1398,34 @@ impl App {
     }
 
     pub fn merge_stories(&mut self, new_stories: Vec<Story>, next_page_token: Option<String>) {
-
         // Filter new stories using the same logic as App::new
-        let filtered_stories: Vec<Story> = new_stories.into_iter().filter(|story| {
-            if is_done_state(story.workflow_state_id, &self.workflows) {
-                // For Done states, only keep stories completed in the current week
-                if let Some(completed_at) = &story.completed_at {
-                    return is_current_week(completed_at);
-                } else if let Some(moved_at) = &story.moved_at {
-                    // Fall back to moved_at if completed_at is not available
-                    return is_current_week(moved_at);
-                } else {
-                    // If no completion date available, use updated_at as fallback
-                    return is_current_week(&story.updated_at);
+        let filtered_stories: Vec<Story> = new_stories
+            .into_iter()
+            .filter(|story| {
+                if is_done_state(story.workflow_state_id, &self.workflows) {
+                    // For Done states, only keep stories completed in the current week
+                    if let Some(completed_at) = &story.completed_at {
+                        return is_current_week(completed_at);
+                    } else if let Some(moved_at) = &story.moved_at {
+                        // Fall back to moved_at if completed_at is not available
+                        return is_current_week(moved_at);
+                    } else {
+                        // If no completion date available, use updated_at as fallback
+                        return is_current_week(&story.updated_at);
+                    }
                 }
-            }
-            // Keep all non-Done stories
-            true
-        }).collect();
+                // Keep all non-Done stories
+                true
+            })
+            .collect();
 
         // Add filtered stories to unfiltered list, avoiding duplicates
         for story in filtered_stories.iter() {
-            if !self.all_stories_unfiltered.iter().any(|existing| existing.id == story.id) {
+            if !self
+                .all_stories_unfiltered
+                .iter()
+                .any(|existing| existing.id == story.id)
+            {
                 self.all_stories_unfiltered.push(story.clone());
             }
         }
@@ -1234,7 +1477,8 @@ impl App {
         // Start with all unfiltered stories
         let filtered_stories = if let Some(epic_id) = self.selected_epic_filter {
             // Filter stories by selected epic
-            self.all_stories_unfiltered.iter()
+            self.all_stories_unfiltered
+                .iter()
                 .filter(|story| story.epic_id == Some(epic_id))
                 .cloned()
                 .collect::<Vec<_>>()
@@ -1338,18 +1582,24 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         if let Some(epic) = app.epics.iter().find(|e| e.id == epic_id) {
             (
                 format!("Shortcut Stories TUI | 🔍 Epic: {}", epic.name),
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
             )
         } else {
             (
                 "Shortcut Stories TUI".to_string(),
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
             )
         }
     } else {
         (
             "Shortcut Stories TUI | All Stories".to_string(),
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         )
     };
 
@@ -1376,34 +1626,35 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         if app.refresh_requested {
             "Refreshing all stories... Please wait...".to_string()
         } else {
-            format!("Loading more stories... | {} stories loaded", app.total_loaded_stories)
+            format!(
+                "Loading more stories... | {} stories loaded",
+                app.total_loaded_stories
+            )
         }
     } else if app.show_epic_selector {
         "[↑/k] [↓/j] select epic | [Enter] apply filter | [Esc] cancel".to_string()
     } else if app.list_view_mode {
-        // List view mode footer
+        // List view mode footer - simplified
         let story_count_text = if app.selected_epic_filter.is_some() {
             format!("{} filtered", app.all_stories_list.len())
         } else {
             format!("{} stories", app.total_loaded_stories)
         };
-        if app.has_more_stories() {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] column view | [n] more | [q] quit | {}", story_count_text)
-        } else {
-            format!("[↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] column view | [q] quit | {}", story_count_text)
-        }
+        format!(
+            "[↑↓] navigate | [Enter] details | [?] help | [q] quit | {}",
+            story_count_text
+        )
     } else {
-        // Column view mode footer
+        // Column view mode footer - simplified
         let story_count_text = if app.selected_epic_filter.is_some() {
             format!("{} filtered", app.all_stories_list.len())
         } else {
             format!("{} stories", app.total_loaded_stories)
         };
-        if app.has_more_stories() {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] list | [n] more | [q] quit | {}", story_count_text)
-        } else {
-            format!("[←/h] [→/l] columns | [↑/k] [↓/j] navigate | [Enter] details | [Space] move | [o] own | [e] edit | [a] add | [f] filter | [r] refresh | [v] list | [q] quit | {}", story_count_text)
-        }
+        format!(
+            "[←→] columns | [↑↓] rows | [Enter] details | [?] help | [q] quit | {}",
+            story_count_text
+        )
     };
     let footer = Paragraph::new(footer_text)
         .style(Style::default().fg(Color::DarkGray))
@@ -1413,33 +1664,40 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     // Detail popup
     if app.show_detail
-        && let Some(story) = app.get_selected_story() {
-            draw_detail_popup(frame, story, app);
-        }
+        && let Some(story) = app.get_selected_story()
+    {
+        draw_detail_popup(frame, story, app);
+    }
 
     // State selector popup
     if app.show_state_selector
-        && let Some(story) = app.get_selected_story() {
-            draw_state_selector_popup(frame, story, app);
-        }
-    
+        && let Some(story) = app.get_selected_story()
+    {
+        draw_state_selector_popup(frame, story, app);
+    }
+
     // Create story popup
     if app.show_create_popup {
         draw_create_popup(frame, app);
     }
-    
+
     // Edit story popup
     if app.show_edit_popup {
         draw_edit_popup(frame, app);
     }
-    
+
     // Git branch popup
     if app.show_git_popup {
         draw_git_popup(frame, app);
     }
-    
+
     if app.show_git_result_popup {
         draw_git_result_popup(frame, app);
+    }
+
+    // Help popup
+    if app.show_help_popup {
+        draw_help_popup(frame, app);
     }
 
     // Epic selector popup
@@ -1452,7 +1710,8 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
     let area = centered_rect(80, 80, frame.area());
     frame.render_widget(Clear, area);
 
-    let workflow_state = app.workflow_state_map
+    let workflow_state = app
+        .workflow_state_map
         .get(&story.workflow_state_id)
         .map(|s| s.as_str())
         .unwrap_or("Unknown");
@@ -1493,11 +1752,12 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
             Span::raw("Unassigned"),
         ]));
     }
-    
+
     text_lines.push(Line::from(""));
-    text_lines.push(Line::from(vec![
-        Span::styled("Description:", Style::default().add_modifier(Modifier::BOLD)),
-    ]));
+    text_lines.push(Line::from(vec![Span::styled(
+        "Description:",
+        Style::default().add_modifier(Modifier::BOLD),
+    )]));
 
     // Add description lines
     if !story.description.is_empty() {
@@ -1517,22 +1777,33 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
     // Add comments section
     if !story.comments.is_empty() {
         text_lines.push(Line::from(""));
-        text_lines.push(Line::from(vec![
-            Span::styled("Comments:", Style::default().add_modifier(Modifier::BOLD)),
-        ]));
+        text_lines.push(Line::from(vec![Span::styled(
+            "Comments:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]));
         text_lines.push(Line::from(""));
 
         for comment in &story.comments {
             // Resolve author name from member cache
-            let author_name = app.member_cache.get(&comment.author_id)
+            let author_name = app
+                .member_cache
+                .get(&comment.author_id)
                 .cloned()
                 .unwrap_or_else(|| comment.author_id.clone());
 
             // Add author and timestamp
             text_lines.push(Line::from(vec![
-                Span::styled(author_name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(
+                    author_name,
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Span::raw(" - "),
-                Span::styled(comment.created_at.clone(), Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    comment.created_at.clone(),
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]));
 
             // Add comment text with proper line wrapping
@@ -1553,7 +1824,9 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
     };
 
     // Apply scroll offset
-    let start_line = app.detail_scroll_offset.min(total_lines.saturating_sub(visible_lines));
+    let start_line = app
+        .detail_scroll_offset
+        .min(total_lines.saturating_sub(visible_lines));
     let end_line = (start_line + visible_lines).min(total_lines);
     let visible_text_lines = if start_line < total_lines {
         text_lines[start_line..end_line].to_vec()
@@ -1563,7 +1836,11 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
 
     // Create title with scroll indicator
     let scroll_indicator = if total_lines > content_height {
-        format!(" Story Details ({}/{}) ", start_line + 1, total_lines.saturating_sub(content_height) + 1)
+        format!(
+            " Story Details ({}/{}) ",
+            start_line + 1,
+            total_lines.saturating_sub(content_height) + 1
+        )
     } else {
         " Story Details ".to_string()
     };
@@ -1585,7 +1862,7 @@ fn draw_state_selector_popup(frame: &mut Frame, story: &Story, app: &App) {
     frame.render_widget(Clear, area);
 
     let available_states = app.get_available_states_for_story(story);
-    
+
     // Create list items for available states
     let items: Vec<ListItem> = available_states
         .iter()
@@ -1605,14 +1882,19 @@ fn draw_state_selector_popup(frame: &mut Frame, story: &Story, app: &App) {
         .collect();
 
     let title = format!(" Move Story #{} to: ", story.id);
-    
-    let list = List::new(items)
-        .block(Block::default()
+
+    let list = List::new(items).block(
+        Block::default()
             .borders(Borders::ALL)
             .title(title)
-            .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
-            .border_style(Style::default().fg(Color::Yellow)));
-    
+            .title_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
+
     frame.render_widget(list, area);
 }
 
@@ -1647,7 +1929,7 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
             Constraint::Length(2), // Help text
         ])
         .split(inner);
-    
+
     // Name field - render TextArea widget
     let mut name_textarea = app.create_popup_state.name_textarea.clone();
     if app.create_popup_state.selected_field == CreateField::Name {
@@ -1655,7 +1937,11 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Name")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .border_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
         );
         name_textarea.set_cursor_line_style(Style::default());
     } else {
@@ -1663,11 +1949,11 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Name")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::White))
+                .border_style(Style::default().fg(Color::White)),
         );
     }
     frame.render_widget(&name_textarea, chunks[0]);
-    
+
     // Description field - render TextArea widget
     let mut desc_textarea = app.create_popup_state.description_textarea.clone();
     if app.create_popup_state.selected_field == CreateField::Description {
@@ -1675,7 +1961,11 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Description")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .border_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
         );
         desc_textarea.set_cursor_line_style(Style::default());
     } else {
@@ -1683,29 +1973,31 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Description")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::White))
+                .border_style(Style::default().fg(Color::White)),
         );
     }
     frame.render_widget(&desc_textarea, chunks[1]);
-    
+
     // Type field
     let type_style = if app.create_popup_state.selected_field == CreateField::Type {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
-    
+
     let type_block = Block::default()
         .title("Type")
         .borders(Borders::ALL)
         .border_style(type_style);
-    
+
     let type_text = if app.create_popup_state.selected_field == CreateField::Type {
         format!("< {} >", app.create_popup_state.story_type)
     } else {
         app.create_popup_state.story_type.clone()
     };
-    
+
     let type_widget = Paragraph::new(type_text)
         .block(type_block)
         .alignment(Alignment::Center);
@@ -1713,7 +2005,9 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
 
     // Epic field
     let epic_style = if app.create_popup_state.selected_field == CreateField::Epic {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
@@ -1725,7 +2019,8 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
 
     let epic_text = if let Some(epic_id) = app.create_popup_state.epic_id {
         // Find epic name from the list
-        app.epics.iter()
+        app.epics
+            .iter()
             .find(|e| e.id == epic_id)
             .map(|e| {
                 if app.create_popup_state.selected_field == CreateField::Epic {
@@ -1790,7 +2085,7 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
             Constraint::Length(2), // Help text
         ])
         .split(inner);
-    
+
     // Name field - render TextArea widget
     let mut name_textarea = app.edit_popup_state.name_textarea.clone();
     if app.edit_popup_state.selected_field == EditField::Name {
@@ -1798,7 +2093,11 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Name")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .border_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
         );
         name_textarea.set_cursor_line_style(Style::default());
     } else {
@@ -1806,11 +2105,11 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Name")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::White))
+                .border_style(Style::default().fg(Color::White)),
         );
     }
     frame.render_widget(&name_textarea, chunks[0]);
-    
+
     // Description field - render TextArea widget
     let mut desc_textarea = app.edit_popup_state.description_textarea.clone();
     if app.edit_popup_state.selected_field == EditField::Description {
@@ -1818,7 +2117,11 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Description")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                .border_style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
         );
         desc_textarea.set_cursor_line_style(Style::default());
     } else {
@@ -1826,29 +2129,31 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title("Description")
                 .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::White))
+                .border_style(Style::default().fg(Color::White)),
         );
     }
     frame.render_widget(&desc_textarea, chunks[1]);
-    
+
     // Type field
     let type_style = if app.edit_popup_state.selected_field == EditField::Type {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
-    
+
     let type_block = Block::default()
         .title("Type")
         .borders(Borders::ALL)
         .border_style(type_style);
-    
+
     let type_text = if app.edit_popup_state.selected_field == EditField::Type {
         format!("< {} >", app.edit_popup_state.story_type)
     } else {
         app.edit_popup_state.story_type.clone()
     };
-    
+
     let type_widget = Paragraph::new(type_text)
         .block(type_block)
         .alignment(Alignment::Center);
@@ -1856,7 +2161,9 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
 
     // Epic field
     let epic_style = if app.edit_popup_state.selected_field == EditField::Epic {
-        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
@@ -1868,7 +2175,8 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
 
     let epic_text = if let Some(epic_id) = app.edit_popup_state.epic_id {
         // Find epic name from the list
-        app.epics.iter()
+        app.epics
+            .iter()
             .find(|e| e.id == epic_id)
             .map(|e| {
                 if app.edit_popup_state.selected_field == EditField::Epic {
@@ -1905,14 +2213,14 @@ fn draw_edit_popup(frame: &mut Frame, app: &App) {
 fn draw_git_popup(frame: &mut Frame, app: &App) {
     let area = centered_rect(60, 40, frame.area());
     frame.render_widget(Clear, area);
-    
+
     // Create the main popup block
     let popup = Block::default()
         .title("Create Git Branch")
         .borders(Borders::ALL)
         .style(Style::default().bg(Color::Black).fg(Color::White));
     frame.render_widget(popup, area);
-    
+
     // Create inner area for content
     let inner = Rect {
         x: area.x + 1,
@@ -1920,7 +2228,7 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         width: area.width.saturating_sub(2),
         height: area.height.saturating_sub(2),
     };
-    
+
     // Create layout chunks
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -1931,7 +2239,7 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
             Constraint::Length(2), // Help text
         ])
         .split(inner);
-    
+
     // Branch name field - render TextArea widget
     let mut branch_textarea = app.git_popup_state.branch_name_textarea.clone();
     let branch_title = if app.git_popup_state.editing_branch_name {
@@ -1948,13 +2256,13 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
         Block::default()
             .title(branch_title)
             .borders(Borders::ALL)
-            .border_style(branch_border_style)
+            .border_style(branch_border_style),
     );
     if app.git_popup_state.editing_branch_name {
         branch_textarea.set_cursor_line_style(Style::default());
     }
     frame.render_widget(&branch_textarea, chunks[0]);
-    
+
     // Worktree path field (only for bare repos) - render TextArea widget
     if app.git_context.is_bare_repo() {
         let mut worktree_textarea = app.git_popup_state.worktree_path_textarea.clone();
@@ -1972,53 +2280,73 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
             Block::default()
                 .title(worktree_title)
                 .borders(Borders::ALL)
-                .border_style(worktree_border_style)
+                .border_style(worktree_border_style),
         );
         if app.git_popup_state.editing_worktree_path {
             worktree_textarea.set_cursor_line_style(Style::default());
         }
         frame.render_widget(&worktree_textarea, chunks[1]);
     }
-    
+
     // Options
     let mut options = Vec::new();
-    
+
     if !app.git_context.is_bare_repo() {
-        let create_branch_style = if app.git_popup_state.selected_option == GitBranchOption::CreateBranch {
-            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
+        let create_branch_style =
+            if app.git_popup_state.selected_option == GitBranchOption::CreateBranch {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
         options.push(ListItem::new("Create Branch").style(create_branch_style));
     }
-    
+
     if app.git_context.is_bare_repo() {
-        let create_worktree_style = if app.git_popup_state.selected_option == GitBranchOption::CreateWorktree {
-            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
+        let create_worktree_style =
+            if app.git_popup_state.selected_option == GitBranchOption::CreateWorktree {
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::White)
+            };
         options.push(ListItem::new("Create Worktree").style(create_worktree_style));
     }
-    
+
     let cancel_style = if app.git_popup_state.selected_option == GitBranchOption::Cancel {
-        Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+        Style::default()
+            .bg(Color::DarkGray)
+            .fg(Color::White)
+            .add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::White)
     };
     options.push(ListItem::new("Cancel").style(cancel_style));
-    
-    let list = List::new(options)
-        .block(Block::default()
+
+    let list = List::new(options).block(
+        Block::default()
             .title("Options")
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Yellow)));
-    
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
+
     frame.render_widget(list, chunks[2]);
-    
+
     // Help text
-    let repo_type = if app.git_context.is_bare_repo() { "bare" } else { "normal" };
-    let current_branch = app.git_context.current_branch.as_deref().unwrap_or("unknown");
+    let repo_type = if app.git_context.is_bare_repo() {
+        "bare"
+    } else {
+        "normal"
+    };
+    let current_branch = app
+        .git_context
+        .current_branch
+        .as_deref()
+        .unwrap_or("unknown");
     let help_text = if app.git_popup_state.editing_branch_name {
         "Editing branch name | [Enter] save | [Esc] cancel | [←/→] move cursor | [Home/End] | [Ctrl+A/Ctrl+E] | [Backspace/Del] | Type to edit".to_string()
     } else if app.git_popup_state.editing_worktree_path {
@@ -2033,7 +2361,7 @@ fn draw_git_popup(frame: &mut Frame, app: &App) {
             base_help
         }
     };
-    
+
     let help = Paragraph::new(help_text)
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center)
@@ -2079,7 +2407,7 @@ fn draw_git_result_popup(frame: &mut Frame, app: &App) {
         .title("Result")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Blue));
-    
+
     let message_text = Paragraph::new(app.git_result_state.message.as_str())
         .block(message_block)
         .wrap(Wrap { trim: true });
@@ -2093,21 +2421,30 @@ fn draw_git_result_popup(frame: &mut Frame, app: &App) {
             .border_style(Style::default().fg(Color::Yellow));
 
         let continue_style = if app.git_result_state.selected_option == GitResultOption::Continue {
-            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .bg(Color::DarkGray)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
 
         let exit_style = if app.git_result_state.selected_option == GitResultOption::ExitAndChange {
-            Style::default().bg(Color::DarkGray).fg(Color::White).add_modifier(Modifier::BOLD)
+            Style::default()
+                .bg(Color::DarkGray)
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
 
         let options = vec![
             ListItem::new("Continue working in current session").style(continue_style),
-            ListItem::new(format!("Exit and change to worktree directory: {}", 
-                app.git_result_state.worktree_path.as_deref().unwrap_or(""))).style(exit_style),
+            ListItem::new(format!(
+                "Exit and change to worktree directory: {}",
+                app.git_result_state.worktree_path.as_deref().unwrap_or("")
+            ))
+            .style(exit_style),
         ];
 
         let list = List::new(options).block(options_block);
@@ -2115,7 +2452,8 @@ fn draw_git_result_popup(frame: &mut Frame, app: &App) {
     }
 
     // Help text
-    let help_text = if app.git_result_state.success && app.git_result_state.worktree_path.is_some() {
+    let help_text = if app.git_result_state.success && app.git_result_state.worktree_path.is_some()
+    {
         "[↑/↓] select option | [Enter] confirm | [Esc] continue"
     } else {
         "[Enter] or [Esc] continue"
@@ -2146,21 +2484,25 @@ fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
     let visible_stories = content_height / 2; // Each story takes 2 lines
     let start_idx = app.list_scroll_offset;
     let end_idx = (start_idx + visible_stories).min(app.all_stories_list.len());
-    
+
     // Available width for text content
     let available_width = area.width.saturating_sub(4) as usize;
 
     // Create list items for visible stories only
-    let items: Vec<ListItem> = app.all_stories_list[start_idx..end_idx].iter().enumerate()
+    let items: Vec<ListItem> = app.all_stories_list[start_idx..end_idx]
+        .iter()
+        .enumerate()
         .map(|(relative_idx, story)| {
             let story_idx = start_idx + relative_idx;
             // Check if story is owned by current user
-            let is_owned = app.current_user_id.as_ref()
+            let is_owned = app
+                .current_user_id
+                .as_ref()
                 .map(|uid| story.owner_ids.contains(uid))
                 .unwrap_or(false);
-            
+
             let is_selected = story_idx == app.list_selected_index;
-            
+
             let style = if is_selected {
                 Style::default()
                     .bg(Color::DarkGray)
@@ -2172,7 +2514,7 @@ fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 Style::default().fg(Color::White)
             };
-            
+
             // Get icon for story type
             let type_icon = match story.story_type.as_str() {
                 "feature" => "✨",
@@ -2180,31 +2522,38 @@ fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
                 "chore" => "🔧",
                 _ => "📝",
             };
-            
+
             // Get state name
-            let state_name = app.workflow_state_map.get(&story.workflow_state_id)
+            let state_name = app
+                .workflow_state_map
+                .get(&story.workflow_state_id)
                 .map(|s| s.as_str())
                 .unwrap_or("Unknown");
-            
+
             // Create first line with story info
             let prefix = format!("[#{}] {} [{}] ", story.id, type_icon, state_name);
             let first_line_width = available_width.saturating_sub(prefix.len());
-            
+
             let mut line1_text = prefix.clone();
             let mut line2_text = String::new();
-            
+
             if story.name.len() <= first_line_width {
                 // Story name fits on first line
                 line1_text.push_str(&story.name);
             } else {
                 // Story name needs to wrap to second line
                 line2_text = if story.name.len() > available_width {
-                    story.name.chars().take(available_width.saturating_sub(3)).collect::<String>() + "..."
+                    story
+                        .name
+                        .chars()
+                        .take(available_width.saturating_sub(3))
+                        .collect::<String>()
+                        + "..."
                 } else {
                     story.name.clone()
                 };
             }
-            
+
             // Create lines
             let line1 = Line::from(Span::styled(line1_text, style));
             let line2 = if line2_text.trim().is_empty() {
@@ -2212,12 +2561,12 @@ fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
             } else {
                 Line::from(Span::styled(line2_text, style))
             };
-            
+
             let text = Text::from(vec![line1, line2]);
             ListItem::new(text)
         })
         .collect();
-    
+
     // Create title with scroll indicators
     let visible_stories = content_height / 2;
     let has_scroll = app.all_stories_list.len() > visible_stories;
@@ -2225,18 +2574,23 @@ fn draw_list_view(frame: &mut Frame, app: &mut App, area: Rect) {
         let total_stories = app.all_stories_list.len();
         let showing_start = start_idx + 1;
         let showing_end = end_idx;
-        format!(" All Stories ({total_stories}) - List View ({showing_start}-{showing_end} of {total_stories}) ")
+        format!(
+            " All Stories ({total_stories}) - List View ({showing_start}-{showing_end} of {total_stories}) "
+        )
     } else {
         format!(" All Stories ({}) - List View ", app.all_stories_list.len())
     };
-    let title_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
-    
-    let list = List::new(items)
-        .block(Block::default()
+    let title_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+
+    let list = List::new(items).block(
+        Block::default()
             .borders(Borders::ALL)
             .title(title)
-            .title_style(title_style));
-    
+            .title_style(title_style),
+    );
+
     frame.render_widget(list, area);
 }
 
@@ -2247,34 +2601,40 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
         let column_constraints: Vec<Constraint> = (0..num_columns)
             .map(|_| Constraint::Percentage((100 / num_columns) as u16))
             .collect();
-        
+
         let columns = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(column_constraints)
             .split(area);
-        
+
         // Render each workflow state column
         for (idx, (state_id, state_name)) in app.workflow_states.iter().enumerate() {
             let is_selected_column = idx == app.selected_column;
-            
+
             // Get the actual column width
             let column_rect = columns[idx];
             // Account for borders (2) and some padding (2)
             let available_width = column_rect.width.saturating_sub(4) as usize;
-            
+
             // Get stories for this state
-            let stories = app.stories_by_state.get(state_id)
+            let stories = app
+                .stories_by_state
+                .get(state_id)
                 .map(|s| s.as_slice())
                 .unwrap_or(&[]);
-            
+
             // Create list items
-            let items: Vec<ListItem> = stories.iter().enumerate()
+            let items: Vec<ListItem> = stories
+                .iter()
+                .enumerate()
                 .map(|(story_idx, story)| {
                     // Check if story is owned by current user
-                    let is_owned = app.current_user_id.as_ref()
+                    let is_owned = app
+                        .current_user_id
+                        .as_ref()
                         .map(|uid| story.owner_ids.contains(uid))
                         .unwrap_or(false);
-                    
+
                     let style = if is_selected_column && story_idx == app.selected_row {
                         Style::default()
                             .bg(Color::DarkGray)
@@ -2286,7 +2646,7 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                     } else {
                         Style::default().fg(Color::White)
                     };
-                    
+
                     // Get icon for story type
                     let type_icon = match story.story_type.as_str() {
                         "feature" => "✨",
@@ -2294,32 +2654,37 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                         "chore" => "🔧",
                         _ => "📝",
                     };
-                    
+
                     // Create prefix for first line
                     let prefix = format!("[#{}] {} ", story.id, type_icon);
-                    
+
                     // Calculate available width for text based on actual column width
                     let first_line_width = available_width.saturating_sub(prefix.len());
                     let second_line_width = available_width;
-                    
+
                     // Handle story name wrapping
                     let mut line1_text = prefix.clone();
                     let mut line2_text = String::new();
-                    
+
                     if story.name.len() <= first_line_width {
                         // Fits on one line
                         line1_text.push_str(&story.name);
                     } else {
                         // Try to wrap at word boundaries
                         let words: Vec<&str> = story.name.split_whitespace().collect();
-                        
+
                         if !words.is_empty() {
                             // Check if even the first word fits
                             if words[0].len() > first_line_width {
                                 // First word is too long, put entire name on second line
                                 // But truncate if it's too long for the second line too
                                 if story.name.len() > second_line_width {
-                                    line2_text = story.name.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                    line2_text = story
+                                        .name
+                                        .chars()
+                                        .take(second_line_width.saturating_sub(3))
+                                        .collect::<String>()
+                                        + "...";
                                 } else {
                                     line2_text = story.name.clone();
                                 }
@@ -2327,11 +2692,13 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                                 // Normal word wrapping
                                 let mut current_length = 0;
                                 let mut on_second_line = false;
-                                
+
                                 for (i, word) in words.iter().enumerate() {
                                     let word_len = word.len() + if i > 0 { 1 } else { 0 }; // +1 for space
-                                    
-                                    if !on_second_line && current_length + word_len <= first_line_width {
+
+                                    if !on_second_line
+                                        && current_length + word_len <= first_line_width
+                                    {
                                         if i > 0 {
                                             line1_text.push(' ');
                                         }
@@ -2345,12 +2712,16 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                                             current_length = word_len;
                                         } else {
                                             // Word is too long for second line, truncate
-                                            line2_text = word.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                            line2_text = word
+                                                .chars()
+                                                .take(second_line_width.saturating_sub(3))
+                                                .collect::<String>()
+                                                + "...";
                                             break;
                                         }
                                     } else {
                                         // Already on second line
-                                       if current_length + word_len < second_line_width {
+                                        if current_length + word_len < second_line_width {
                                             line2_text.push(' ');
                                             line2_text.push_str(word);
                                             current_length += word_len + 1;
@@ -2359,7 +2730,11 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                                             if line2_text.len() + 3 <= second_line_width {
                                                 line2_text.push_str("...");
                                             } else {
-                                                line2_text = line2_text.chars().take(second_line_width.saturating_sub(3)).collect::<String>() + "...";
+                                                line2_text = line2_text
+                                                    .chars()
+                                                    .take(second_line_width.saturating_sub(3))
+                                                    .collect::<String>()
+                                                    + "...";
                                             }
                                             break;
                                         }
@@ -2368,7 +2743,7 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                             }
                         }
                     }
-                    
+
                     // Create lines
                     let line1 = Line::from(Span::styled(line1_text, style));
                     let line2 = if line2_text.trim().is_empty() {
@@ -2376,27 +2751,30 @@ fn draw_column_view(frame: &mut Frame, app: &App, area: Rect) {
                     } else {
                         Line::from(Span::styled(line2_text, style))
                     };
-                    
+
                     let text = Text::from(vec![line1, line2]);
                     ListItem::new(text)
                 })
                 .collect();
-            
+
             // Column title style
             let title_style = if is_selected_column {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::White)
             };
-            
+
             let title = format!(" {} ({}) ", state_name, stories.len());
-            
-            let list = List::new(items)
-                .block(Block::default()
+
+            let list = List::new(items).block(
+                Block::default()
                     .borders(Borders::ALL)
                     .title(title)
-                    .title_style(title_style));
-            
+                    .title_style(title_style),
+            );
+
             frame.render_widget(list, columns[idx]);
         }
     } else {
@@ -2457,14 +2835,117 @@ fn draw_epic_selector_popup(frame: &mut Frame, app: &App) {
         " Filter by Epic (Current: All Stories) ".to_string()
     };
 
-    let list = List::new(items)
-        .block(Block::default()
+    let list = List::new(items).block(
+        Block::default()
             .borders(Borders::ALL)
             .title(title)
-            .title_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
-            .border_style(Style::default().fg(Color::Yellow)));
+            .title_style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
 
     frame.render_widget(list, area);
+}
+
+fn draw_help_popup(frame: &mut Frame, app: &App) {
+    let area = centered_rect(70, 80, frame.area());
+    frame.render_widget(Clear, area);
+
+    // Define keyboard shortcuts
+    let shortcuts = vec![
+        (
+            "Navigation",
+            vec![
+                ("↑/k", "Move up"),
+                ("↓/j", "Move down"),
+                ("←/h", "Move left (column view)"),
+                ("→/l", "Move right (column view)"),
+            ],
+        ),
+        (
+            "View",
+            vec![
+                ("Enter", "Show story details"),
+                ("v", "Toggle list/column view"),
+                ("f", "Filter by epic"),
+                ("r", "Refresh all stories"),
+                ("n", "Load more stories"),
+            ],
+        ),
+        (
+            "Story Actions",
+            vec![
+                ("Space", "Move story to another state"),
+                ("o", "Take ownership of story"),
+                ("e", "Edit story"),
+                ("a", "Add new story"),
+                ("g", "Create git branch (if in git repo)"),
+            ],
+        ),
+        (
+            "Application",
+            vec![("?", "Show/hide this help"), ("q", "Quit application")],
+        ),
+    ];
+
+    // Create the help content
+    let mut text_lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Keyboard Shortcuts",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+    ];
+
+    let mut command_count = 0;
+    for (section, commands) in &shortcuts {
+        text_lines.push(Line::from(Span::styled(
+            format!("  {}", section),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )));
+        text_lines.push(Line::from(""));
+
+        for (key, description) in commands {
+            let is_selected = command_count == app.help_selected_index;
+            let style = if is_selected {
+                Style::default().bg(Color::DarkGray).fg(Color::White)
+            } else {
+                Style::default()
+            };
+
+            let line = Line::from(vec![
+                Span::styled("    ", style),
+                Span::styled(format!("{:<10}", key), style.fg(Color::Green)),
+                Span::styled(format!(" {}", description), style),
+            ]);
+            text_lines.push(line);
+            command_count += 1;
+        }
+        text_lines.push(Line::from(""));
+    }
+
+    text_lines.push(Line::from(""));
+    text_lines.push(Line::from(Span::styled(
+        "  Press Esc or ? to close",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    let help_text = Paragraph::new(text_lines).block(
+        Block::default()
+            .title(" Help ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::White)),
+    );
+
+    frame.render_widget(help_text, area);
 }
 
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {

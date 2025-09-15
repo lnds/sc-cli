@@ -24,7 +24,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 2,
@@ -42,7 +42,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 3,
@@ -60,7 +60,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
         ]
     }
@@ -184,17 +184,17 @@ mod tests {
         app.previous();
         assert_eq!(app.selected_column, 0);
         assert_eq!(app.selected_row, 0);
-        
+
         // With empty stories but 3 workflow states, column navigation should work
         app.next_column();
         assert_eq!(app.selected_column, 1);
-        
+
         app.next_column();
         assert_eq!(app.selected_column, 2);
-        
+
         app.next_column();
         assert_eq!(app.selected_column, 0); // Wrap around
-        
+
         app.previous_column();
         assert_eq!(app.selected_column, 2); // Wrap around
     }
@@ -264,7 +264,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 1,
@@ -282,7 +282,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 2,
@@ -300,10 +300,10 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
         ];
-        
+
         let workflows = vec![Workflow {
             id: 1,
             name: "Default Workflow".to_string(),
@@ -315,9 +315,9 @@ mod tests {
                 state_type: "unstarted".to_string(),
             }],
         }];
-        
+
         let app = App::new(stories, workflows, "test query".to_string(), None);
-        
+
         // Check that stories are sorted by position
         let sorted_stories = app.stories_by_state.get(&10).unwrap();
         assert_eq!(sorted_stories.len(), 3);
@@ -331,50 +331,60 @@ mod tests {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
-        
+
         // Initially popup should not be shown
         assert!(!app.show_create_popup);
-        
+
         // Simulate pressing 'a' key
         app.handle_key_event(crossterm::event::KeyEvent {
             code: crossterm::event::KeyCode::Char('a'),
             modifiers: crossterm::event::KeyModifiers::NONE,
             kind: crossterm::event::KeyEventKind::Press,
             state: crossterm::event::KeyEventState::NONE,
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         // Popup should now be shown
         assert!(app.show_create_popup);
-        assert_eq!(app.create_popup_state.selected_field, crate::ui::CreateField::Name);
-        
+        assert_eq!(
+            app.create_popup_state.selected_field,
+            crate::ui::CreateField::Name
+        );
+
         // Test typing in name field
         app.handle_key_event(crossterm::event::KeyEvent {
             code: crossterm::event::KeyCode::Char('T'),
             modifiers: crossterm::event::KeyModifiers::NONE,
             kind: crossterm::event::KeyEventKind::Press,
             state: crossterm::event::KeyEventState::NONE,
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         assert_eq!(app.create_popup_state.name_textarea.lines()[0], "T");
-        
+
         // Test Tab to move to description
         app.handle_key_event(crossterm::event::KeyEvent {
             code: crossterm::event::KeyCode::Tab,
             modifiers: crossterm::event::KeyModifiers::NONE,
             kind: crossterm::event::KeyEventKind::Press,
             state: crossterm::event::KeyEventState::NONE,
-        }).unwrap();
-        
-        assert_eq!(app.create_popup_state.selected_field, crate::ui::CreateField::Description);
-        
+        })
+        .unwrap();
+
+        assert_eq!(
+            app.create_popup_state.selected_field,
+            crate::ui::CreateField::Description
+        );
+
         // Test Esc to close
         app.handle_key_event(crossterm::event::KeyEvent {
             code: crossterm::event::KeyCode::Esc,
             modifiers: crossterm::event::KeyModifiers::NONE,
             kind: crossterm::event::KeyEventKind::Press,
             state: crossterm::event::KeyEventState::NONE,
-        }).unwrap();
-        
+        })
+        .unwrap();
+
         assert!(!app.show_create_popup);
     }
 
@@ -383,33 +393,33 @@ mod tests {
         let stories = create_test_stories();
         let workflows = create_test_workflows();
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
-        
+
         // Initially scroll offset should be 0
         assert_eq!(app.detail_scroll_offset, 0);
-        
+
         // Show detail view
         app.toggle_detail();
         assert!(app.show_detail);
         assert_eq!(app.detail_scroll_offset, 0); // Should reset on open
-        
+
         // Test scrolling down
         app.detail_scroll_offset += 1;
         assert_eq!(app.detail_scroll_offset, 1);
-        
+
         app.detail_scroll_offset += 1;
         assert_eq!(app.detail_scroll_offset, 2);
-        
+
         // Test scrolling up
         app.scroll_detail_up();
         assert_eq!(app.detail_scroll_offset, 1);
-        
+
         app.scroll_detail_up();
         assert_eq!(app.detail_scroll_offset, 0);
-        
+
         // Test that scrolling up at 0 doesn't go negative
         app.scroll_detail_up();
         assert_eq!(app.detail_scroll_offset, 0);
-        
+
         // Test that closing detail view resets scroll
         app.detail_scroll_offset = 5;
         app.toggle_detail(); // Close
@@ -440,7 +450,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 2,
@@ -458,7 +468,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
         ];
 
@@ -495,7 +505,7 @@ mod tests {
         // Should select column 1 (second workflow state) since first is empty
         assert_eq!(app.selected_column, 1);
         assert_eq!(app.selected_row, 0);
-        
+
         // Verify the selected story is correct
         let selected_story = app.get_selected_story().unwrap();
         assert_eq!(selected_story.id, 1); // First story in the second state
@@ -504,26 +514,24 @@ mod tests {
     #[test]
     fn test_initial_selection_first_column_has_stories() {
         // Create stories where first workflow state has stories
-        let stories = vec![
-            Story {
-                id: 1,
-                name: "Story in first state".to_string(),
-                description: "".to_string(),
-                workflow_state_id: 10, // First workflow state
-                app_url: "".to_string(),
-                story_type: "feature".to_string(),
-                labels: vec![],
-                owner_ids: vec![],
-                position: 1000,
-                created_at: "".to_string(),
-                updated_at: "".to_string(),
-                completed_at: None,
-                moved_at: None,
-                comments: vec![],
-                formatted_vcs_branch_name: None,
+        let stories = vec![Story {
+            id: 1,
+            name: "Story in first state".to_string(),
+            description: "".to_string(),
+            workflow_state_id: 10, // First workflow state
+            app_url: "".to_string(),
+            story_type: "feature".to_string(),
+            labels: vec![],
+            owner_ids: vec![],
+            position: 1000,
+            created_at: "".to_string(),
+            updated_at: "".to_string(),
+            completed_at: None,
+            moved_at: None,
+            comments: vec![],
+            formatted_vcs_branch_name: None,
             epic_id: None,
-            },
-        ];
+        }];
 
         let workflows = vec![Workflow {
             id: 1,
@@ -551,7 +559,7 @@ mod tests {
         // Should select column 0 (first workflow state) since it has stories
         assert_eq!(app.selected_column, 0);
         assert_eq!(app.selected_row, 0);
-        
+
         // Verify the selected story is correct
         let selected_story = app.get_selected_story().unwrap();
         assert_eq!(selected_story.id, 1);
@@ -588,7 +596,7 @@ mod tests {
         // Should still select column 0 (fallback behavior)
         assert_eq!(app.selected_column, 0);
         assert_eq!(app.selected_row, 0);
-        
+
         // Verify no story is selected
         assert!(app.get_selected_story().is_none());
     }
@@ -596,26 +604,24 @@ mod tests {
     #[test]
     fn test_initial_selection_last_column_has_stories() {
         // Create stories where only the last workflow state has stories
-        let stories = vec![
-            Story {
-                id: 1,
-                name: "Story in last state".to_string(),
-                description: "".to_string(),
-                workflow_state_id: 30, // Last workflow state
-                app_url: "".to_string(),
-                story_type: "feature".to_string(),
-                labels: vec![],
-                owner_ids: vec![],
-                position: 1000,
-                created_at: "".to_string(),
-                updated_at: "".to_string(),
-                completed_at: None,
-                moved_at: None,
-                comments: vec![],
-                formatted_vcs_branch_name: None,
+        let stories = vec![Story {
+            id: 1,
+            name: "Story in last state".to_string(),
+            description: "".to_string(),
+            workflow_state_id: 30, // Last workflow state
+            app_url: "".to_string(),
+            story_type: "feature".to_string(),
+            labels: vec![],
+            owner_ids: vec![],
+            position: 1000,
+            created_at: "".to_string(),
+            updated_at: "".to_string(),
+            completed_at: None,
+            moved_at: None,
+            comments: vec![],
+            formatted_vcs_branch_name: None,
             epic_id: None,
-            },
-        ];
+        }];
 
         let workflows = vec![Workflow {
             id: 1,
@@ -650,7 +656,7 @@ mod tests {
         // Should select column 2 (last workflow state) since others are empty
         assert_eq!(app.selected_column, 2);
         assert_eq!(app.selected_row, 0);
-        
+
         // Verify the selected story is correct
         let selected_story = app.get_selected_story().unwrap();
         assert_eq!(selected_story.id, 1);

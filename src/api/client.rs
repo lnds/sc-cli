@@ -1,7 +1,7 @@
 use super::*;
+use super::{CurrentMember, Epic};
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
-use super::{CurrentMember, Epic};
 
 pub struct ShortcutClient {
     pub(crate) client: Client,
@@ -44,21 +44,24 @@ impl ShortcutApi for ShortcutClient {
         let mut all_stories = Vec::new();
         let page_size = 25; // Maximum allowed by Shortcut API
         let mut next_token: Option<String> = None;
-        
+
         if self.debug {
             eprintln!("Searching with query: {query}");
             if let Some(l) = limit {
                 eprintln!("Limit: {l}");
             }
         }
-        
+
         loop {
             // Build query parameters
-            let mut params = vec![("query", query.to_string()), ("page_size", page_size.to_string())];
+            let mut params = vec![
+                ("query", query.to_string()),
+                ("page_size", page_size.to_string()),
+            ];
             if let Some(ref token) = next_token {
                 params.push(("next", token.clone()));
             }
-            
+
             let response = self
                 .client
                 .get(&url)
@@ -71,19 +74,28 @@ impl ShortcutApi for ShortcutClient {
             if self.debug {
                 eprintln!("Response status: {status}");
             }
-            
+
             if !status.is_success() {
-                let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-                anyhow::bail!("API request failed with status: {}. Error: {}", status, error_text);
+                let error_text = response
+                    .text()
+                    .unwrap_or_else(|_| "Unknown error".to_string());
+                anyhow::bail!(
+                    "API request failed with status: {}. Error: {}",
+                    status,
+                    error_text
+                );
             }
 
             let response_text = response.text().context("Failed to read response text")?;
             if self.debug && next_token.is_none() {
-                eprintln!("Response preview: {}", &response_text.chars().take(500).collect::<String>());
+                eprintln!(
+                    "Response preview: {}",
+                    &response_text.chars().take(500).collect::<String>()
+                );
             }
-            
-            let search_response: SearchResponse = serde_json::from_str(&response_text)
-                .context("Failed to parse search response")?;
+
+            let search_response: SearchResponse =
+                serde_json::from_str(&response_text).context("Failed to parse search response")?;
 
             let stories_count = search_response.stories.data.len();
             if self.debug {
@@ -92,34 +104,35 @@ impl ShortcutApi for ShortcutClient {
                     eprintln!("Total available stories: {total}");
                 }
             }
-            
+
             all_stories.extend(search_response.stories.data);
-            
+
             // Check if we have enough stories
             if let Some(l) = limit
-                && all_stories.len() >= l {
-                    all_stories.truncate(l);
-                    break;
-                }
-            
+                && all_stories.len() >= l
+            {
+                all_stories.truncate(l);
+                break;
+            }
+
             // Check if we have a next page
             next_token = search_response.next.or(search_response.stories.next);
-            
+
             if next_token.is_none() || stories_count == 0 {
                 break;
             }
         }
-        
+
         if self.debug {
             eprintln!("Total stories fetched: {}", all_stories.len());
         }
-        
+
         Ok(all_stories)
     }
 
     fn get_workflows(&self) -> Result<Vec<Workflow>> {
         let url = format!("{}/workflows", self.base_url);
-        
+
         let response = self
             .client
             .get(&url)
@@ -140,11 +153,11 @@ impl ShortcutApi for ShortcutClient {
 
     fn get_story(&self, story_id: i64) -> Result<Story> {
         let url = format!("{}/stories/{}", self.base_url, story_id);
-        
+
         if self.debug {
             eprintln!("Fetching story #{story_id}...");
         }
-        
+
         let response = self
             .client
             .get(&url)
@@ -158,7 +171,9 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
             if status.as_u16() == 404 {
                 anyhow::bail!("Story #{story_id} not found");
             } else {
@@ -166,9 +181,7 @@ impl ShortcutApi for ShortcutClient {
             }
         }
 
-        let story: Story = response
-            .json()
-            .context("Failed to parse story response")?;
+        let story: Story = response.json().context("Failed to parse story response")?;
 
         if self.debug {
             eprintln!("Successfully fetched story #{} - {}", story.id, story.name);
@@ -179,7 +192,7 @@ impl ShortcutApi for ShortcutClient {
 
     fn update_story_state(&self, story_id: i64, workflow_state_id: i64) -> Result<Story> {
         let url = format!("{}/stories/{}", self.base_url, story_id);
-        
+
         let update_payload = serde_json::json!({
             "workflow_state_id": workflow_state_id
         });
@@ -187,7 +200,7 @@ impl ShortcutApi for ShortcutClient {
         if self.debug {
             eprintln!("Updating story {story_id} to workflow state {workflow_state_id}");
         }
-        
+
         let response = self
             .client
             .put(&url)
@@ -202,8 +215,14 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("Failed to update story state: {}. Error: {}", status, error_text);
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!(
+                "Failed to update story state: {}. Error: {}",
+                status,
+                error_text
+            );
         }
 
         let updated_story: Story = response
@@ -215,11 +234,11 @@ impl ShortcutApi for ShortcutClient {
 
     fn get_current_member(&self) -> Result<CurrentMember> {
         let url = format!("{}/member", self.base_url);
-        
+
         if self.debug {
             eprintln!("Fetching current member...");
         }
-        
+
         let response = self
             .client
             .get(&url)
@@ -233,20 +252,24 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("Failed to get current member: {}. Error: {}", status, error_text);
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!(
+                "Failed to get current member: {}. Error: {}",
+                status,
+                error_text
+            );
         }
 
-        let member: CurrentMember = response
-            .json()
-            .context("Failed to parse member response")?;
+        let member: CurrentMember = response.json().context("Failed to parse member response")?;
 
         Ok(member)
     }
 
     fn update_story(&self, story_id: i64, owner_ids: Vec<String>) -> Result<Story> {
         let url = format!("{}/stories/{}", self.base_url, story_id);
-        
+
         let update_payload = serde_json::json!({
             "owner_ids": owner_ids
         });
@@ -254,7 +277,7 @@ impl ShortcutApi for ShortcutClient {
         if self.debug {
             eprintln!("Updating story {story_id} owners to {owner_ids:?}");
         }
-        
+
         let response = self
             .client
             .put(&url)
@@ -269,8 +292,14 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("Failed to update story owners: {}. Error: {}", status, error_text);
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!(
+                "Failed to update story owners: {}. Error: {}",
+                status,
+                error_text
+            );
         }
 
         let updated_story: Story = response
@@ -280,7 +309,14 @@ impl ShortcutApi for ShortcutClient {
         Ok(updated_story)
     }
 
-    fn update_story_details(&self, story_id: i64, name: String, description: String, story_type: String, epic_id: Option<i64>) -> Result<Story> {
+    fn update_story_details(
+        &self,
+        story_id: i64,
+        name: String,
+        description: String,
+        story_type: String,
+        epic_id: Option<i64>,
+    ) -> Result<Story> {
         let url = format!("{}/stories/{}", self.base_url, story_id);
 
         let mut update_payload = serde_json::json!({
@@ -291,13 +327,21 @@ impl ShortcutApi for ShortcutClient {
 
         // Add epic_id if provided (null to unset)
         if let Some(payload_obj) = update_payload.as_object_mut() {
-            payload_obj.insert("epic_id".to_string(), epic_id.map(|id| serde_json::json!(id)).unwrap_or(serde_json::Value::Null));
+            payload_obj.insert(
+                "epic_id".to_string(),
+                epic_id
+                    .map(|id| serde_json::json!(id))
+                    .unwrap_or(serde_json::Value::Null),
+            );
         }
 
         if self.debug {
-            eprintln!("Updating story {story_id} details: name='{name}', description='{description}', type='{story_type}', epic_id={:?}", epic_id);
+            eprintln!(
+                "Updating story {story_id} details: name='{name}', description='{description}', type='{story_type}', epic_id={:?}",
+                epic_id
+            );
         }
-        
+
         let response = self
             .client
             .put(&url)
@@ -312,8 +356,14 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("Failed to update story details: {}. Error: {}", status, error_text);
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!(
+                "Failed to update story details: {}. Error: {}",
+                status,
+                error_text
+            );
         }
 
         let updated_story: Story = response
@@ -321,7 +371,10 @@ impl ShortcutApi for ShortcutClient {
             .context("Failed to parse updated story response")?;
 
         if self.debug {
-            eprintln!("Successfully updated story #{} - {}", updated_story.id, updated_story.name);
+            eprintln!(
+                "Successfully updated story #{} - {}",
+                updated_story.id, updated_story.name
+            );
         }
 
         Ok(updated_story)
@@ -329,11 +382,11 @@ impl ShortcutApi for ShortcutClient {
 
     fn get_members(&self) -> Result<Vec<Member>> {
         let url = format!("{}/members", self.base_url);
-        
+
         if self.debug {
             eprintln!("Fetching all members...");
         }
-        
+
         let response = self
             .client
             .get(&url)
@@ -347,18 +400,23 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
             anyhow::bail!("Failed to get members: {}. Error: {}", status, error_text);
         }
 
         let response_text = response.text().context("Failed to read members response")?;
-        
+
         if self.debug {
-            eprintln!("Members response preview: {}", &response_text.chars().take(500).collect::<String>());
+            eprintln!(
+                "Members response preview: {}",
+                &response_text.chars().take(500).collect::<String>()
+            );
         }
-        
-        let members: Vec<Member> = serde_json::from_str(&response_text)
-            .context("Failed to parse members response")?;
+
+        let members: Vec<Member> =
+            serde_json::from_str(&response_text).context("Failed to parse members response")?;
 
         if self.debug {
             eprintln!("Fetched {} members", members.len());
@@ -367,7 +425,15 @@ impl ShortcutApi for ShortcutClient {
         Ok(members)
     }
 
-    fn create_story(&self, name: String, description: String, story_type: String, requested_by_id: String, workflow_state_id: i64, epic_id: Option<i64>) -> Result<Story> {
+    fn create_story(
+        &self,
+        name: String,
+        description: String,
+        story_type: String,
+        requested_by_id: String,
+        workflow_state_id: i64,
+        epic_id: Option<i64>,
+    ) -> Result<Story> {
         let url = format!("{}/stories", self.base_url);
 
         let mut create_payload = serde_json::json!({
@@ -380,14 +446,18 @@ impl ShortcutApi for ShortcutClient {
 
         // Add epic_id if provided
         if let Some(id) = epic_id
-            && let Some(payload_obj) = create_payload.as_object_mut() {
-                payload_obj.insert("epic_id".to_string(), serde_json::json!(id));
-            }
+            && let Some(payload_obj) = create_payload.as_object_mut()
+        {
+            payload_obj.insert("epic_id".to_string(), serde_json::json!(id));
+        }
 
         if self.debug {
-            eprintln!("Creating story with payload: {}", serde_json::to_string_pretty(&create_payload)?);
+            eprintln!(
+                "Creating story with payload: {}",
+                serde_json::to_string_pretty(&create_payload)?
+            );
         }
-        
+
         let response = self
             .client
             .post(&url)
@@ -402,7 +472,9 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
             anyhow::bail!("Failed to create story: {}. Error: {}", status, error_text);
         }
 
@@ -411,29 +483,39 @@ impl ShortcutApi for ShortcutClient {
             .context("Failed to parse created story response")?;
 
         if self.debug {
-            eprintln!("Successfully created story #{} - {}", created_story.id, created_story.name);
+            eprintln!(
+                "Successfully created story #{} - {}",
+                created_story.id, created_story.name
+            );
         }
 
         Ok(created_story)
     }
 
-    fn search_stories_page(&self, query: &str, next_token: Option<String>) -> Result<super::SearchStoriesResult> {
+    fn search_stories_page(
+        &self,
+        query: &str,
+        next_token: Option<String>,
+    ) -> Result<super::SearchStoriesResult> {
         let url = format!("{}/search", self.base_url);
         let page_size = 25; // Maximum allowed by Shortcut API
-        
+
         if self.debug {
             eprintln!("Searching single page with query: {query}");
             if let Some(ref token) = next_token {
                 eprintln!("Using next token: {token}");
             }
         }
-        
+
         // Build query parameters
-        let mut params = vec![("query", query.to_string()), ("page_size", page_size.to_string())];
+        let mut params = vec![
+            ("query", query.to_string()),
+            ("page_size", page_size.to_string()),
+        ];
         if let Some(ref token) = next_token {
             params.push(("next", token.clone()));
         }
-        
+
         let response = self
             .client
             .get(&url)
@@ -446,19 +528,28 @@ impl ShortcutApi for ShortcutClient {
         if self.debug {
             eprintln!("Response status: {status}");
         }
-        
+
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
-            anyhow::bail!("API request failed with status: {}. Error: {}", status, error_text);
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!(
+                "API request failed with status: {}. Error: {}",
+                status,
+                error_text
+            );
         }
 
         let response_text = response.text().context("Failed to read response text")?;
         if self.debug {
-            eprintln!("Response preview: {}", &response_text.chars().take(500).collect::<String>());
+            eprintln!(
+                "Response preview: {}",
+                &response_text.chars().take(500).collect::<String>()
+            );
         }
-        
-        let search_response: super::SearchResponse = serde_json::from_str(&response_text)
-            .context("Failed to parse search response")?;
+
+        let search_response: super::SearchResponse =
+            serde_json::from_str(&response_text).context("Failed to parse search response")?;
 
         let stories_count = search_response.stories.data.len();
         if self.debug {
@@ -467,10 +558,10 @@ impl ShortcutApi for ShortcutClient {
                 eprintln!("Total available stories: {total}");
             }
         }
-        
+
         // Get next page token
         let next_page_token = search_response.next.or(search_response.stories.next);
-        
+
         Ok(super::SearchStoriesResult {
             stories: search_response.stories.data,
             next_page_token,
@@ -498,13 +589,13 @@ impl ShortcutApi for ShortcutClient {
         }
 
         if !status.is_success() {
-            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
             anyhow::bail!("Failed to get epics: {}. Error: {}", status, error_text);
         }
 
-        let epics: Vec<Epic> = response
-            .json()
-            .context("Failed to parse epics response")?;
+        let epics: Vec<Epic> = response.json().context("Failed to parse epics response")?;
 
         if self.debug {
             eprintln!("Successfully fetched {} epics", epics.len());

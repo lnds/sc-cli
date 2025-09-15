@@ -1,6 +1,6 @@
 use crate::api::{Story, Workflow, WorkflowState};
 use crate::ui::{App, draw};
-use ratatui::{backend::TestBackend, Terminal};
+use ratatui::{Terminal, backend::TestBackend};
 
 #[cfg(test)]
 mod tests {
@@ -52,7 +52,7 @@ mod tests {
         terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
-        
+
         // Check header is rendered
         // Convert buffer to string for easier testing
         let mut buffer_str = String::new();
@@ -63,7 +63,7 @@ mod tests {
                 }
             }
         }
-        
+
         // Check header is rendered
         assert!(buffer_str.contains("Shortcut Stories TUI"));
 
@@ -75,12 +75,15 @@ mod tests {
         // Check footer is rendered - at least parts of it should be visible
         // The footer text might be truncated on a small terminal
         // Let's just check that some footer content exists
-        let has_footer_content = buffer_str.contains("columns") || 
-                                buffer_str.contains("navigate") || 
-                                buffer_str.contains("details") ||
-                                buffer_str.contains("[q]") || 
-                                buffer_str.contains("quit");
-        assert!(has_footer_content, "Footer should contain navigation instructions");
+        let has_footer_content = buffer_str.contains("columns")
+            || buffer_str.contains("navigate")
+            || buffer_str.contains("details")
+            || buffer_str.contains("[q]")
+            || buffer_str.contains("quit");
+        assert!(
+            has_footer_content,
+            "Footer should contain navigation instructions"
+        );
     }
 
     #[test]
@@ -94,7 +97,7 @@ mod tests {
         terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
-        
+
         // Convert buffer to string for easier testing
         let mut buffer_str = String::new();
         for y in 0..buffer.area().height {
@@ -104,7 +107,7 @@ mod tests {
                 }
             }
         }
-        
+
         // Check detail popup is rendered
         assert!(buffer_str.contains("Story Details"));
         assert!(buffer_str.contains("ID:"));
@@ -135,7 +138,7 @@ mod tests {
         terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
-        
+
         // Convert buffer to string for easier testing
         let mut buffer_str = String::new();
         for y in 0..buffer.area().height {
@@ -145,10 +148,15 @@ mod tests {
                 }
             }
         }
-        
+
         // Should still render header and footer
         assert!(buffer_str.contains("Shortcut Stories TUI"));
-        assert!(buffer_str.contains("navigate"));
+        // Check for the new simplified footer format
+        assert!(
+            buffer_str.contains("[↑↓]")
+                || buffer_str.contains("navigate")
+                || buffer_str.contains("help")
+        );
     }
 
     #[test]
@@ -170,7 +178,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 2,
@@ -188,32 +196,30 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
         ];
 
-        let workflows = vec![
-            Workflow {
-                id: 1,
-                name: "Default Workflow".to_string(),
-                states: vec![
-                    WorkflowState {
-                        id: 10,
-                        name: "To Do".to_string(),
-                        color: "#000000".to_string(),
-                        position: 1,
-                        state_type: "unstarted".to_string(),
-                    },
-                    WorkflowState {
-                        id: 20,
-                        name: "In Progress".to_string(),
-                        color: "#f39c12".to_string(),
-                        position: 2,
-                        state_type: "started".to_string(),
-                    },
-                ],
-            },
-        ];
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Default Workflow".to_string(),
+            states: vec![
+                WorkflowState {
+                    id: 10,
+                    name: "To Do".to_string(),
+                    color: "#000000".to_string(),
+                    position: 1,
+                    state_type: "unstarted".to_string(),
+                },
+                WorkflowState {
+                    id: 20,
+                    name: "In Progress".to_string(),
+                    color: "#f39c12".to_string(),
+                    position: 2,
+                    state_type: "started".to_string(),
+                },
+            ],
+        }];
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
@@ -222,7 +228,7 @@ mod tests {
         terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
-        
+
         // Convert buffer to string for easier testing
         let mut buffer_str = String::new();
         for y in 0..buffer.area().height {
@@ -232,7 +238,7 @@ mod tests {
                 }
             }
         }
-        
+
         // Check both stories are rendered
         assert!(buffer_str.contains("[#1]"));
         assert!(buffer_str.contains("🐞")); // Bug type icon
@@ -283,22 +289,18 @@ mod tests {
             },
         ];
 
-        let workflows = vec![
-            Workflow {
-                id: 1,
-                name: "Default Workflow".to_string(),
-                states: vec![
-                    WorkflowState {
-                        id: 10,
-                        name: "To Do".to_string(),
-                        color: "#000000".to_string(),
-                        position: 1,
-                        state_type: "unstarted".to_string(),
-                    },
-                ],
-            },
-        ];
-        
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Default Workflow".to_string(),
+            states: vec![WorkflowState {
+                id: 10,
+                name: "To Do".to_string(),
+                color: "#000000".to_string(),
+                position: 1,
+                state_type: "unstarted".to_string(),
+            }],
+        }];
+
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         let backend = TestBackend::new(80, 24);
@@ -307,7 +309,7 @@ mod tests {
         terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
-        
+
         // Convert buffer to string for easier testing
         let mut buffer_str = String::new();
         for y in 0..buffer.area().height {
@@ -318,12 +320,12 @@ mod tests {
             }
             buffer_str.push('\n');
         }
-        
+
         // Check that the long story name appears on the second line
         assert!(buffer_str.contains("[#1] ✨"));
         // The long name should appear somewhere in the buffer (might be truncated)
         assert!(buffer_str.contains("ThisIsAVeryLongStoryName"));
-        
+
         // Check that the normal story wraps properly
         assert!(buffer_str.contains("[#2] 🐞"));
         assert!(buffer_str.contains("This is a normal story name"));
@@ -348,7 +350,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 2,
@@ -366,26 +368,22 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
         ];
 
-        let workflows = vec![
-            Workflow {
-                id: 1,
-                name: "Default Workflow".to_string(),
-                states: vec![
-                    WorkflowState {
-                        id: 10,
-                        name: "To Do".to_string(),
-                        color: "#000000".to_string(),
-                        position: 1,
-                        state_type: "unstarted".to_string(),
-                    },
-                ],
-            },
-        ];
-        
+        let workflows = vec![Workflow {
+            id: 1,
+            name: "Default Workflow".to_string(),
+            states: vec![WorkflowState {
+                id: 10,
+                name: "To Do".to_string(),
+                color: "#000000".to_string(),
+                position: 1,
+                state_type: "unstarted".to_string(),
+            }],
+        }];
+
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
         // Set current user to highlight owned stories
         app.set_current_user_id("current-user".to_string());
@@ -396,17 +394,17 @@ mod tests {
         terminal.draw(|f| draw(f, &mut app)).unwrap();
 
         let buffer = terminal.backend().buffer();
-        
+
         // Find the cells containing the owned story
         let mut owned_story_color = None;
         let mut other_story_color = None;
-        
+
         for y in 0..buffer.area().height {
             let mut line = String::new();
             for x in 0..buffer.area().width {
                 if let Some(cell) = buffer.cell((x, y)) {
                     line.push_str(cell.symbol());
-                    
+
                     // Check color of cells containing story names (now on second line)
                     if line.contains("My Story") && owned_story_color.is_none() {
                         owned_story_color = Some(cell.style().fg);
@@ -417,13 +415,15 @@ mod tests {
                 }
             }
         }
-        
+
         // Verify owned story has cyan color (Color::Cyan)
         assert!(owned_story_color.is_some(), "Should find owned story");
         assert!(other_story_color.is_some(), "Should find other story");
-        
+
         // The owned story should have a different color than the other story
-        assert_ne!(owned_story_color, other_story_color, 
-            "Owned story should have different color than non-owned story");
+        assert_ne!(
+            owned_story_color, other_story_color,
+            "Owned story should have different color than non-owned story"
+        );
     }
 }

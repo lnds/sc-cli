@@ -162,4 +162,5 @@ pub trait ShortcutApi {
         epic_id: Option<i64>,
     ) -> Result<Story>;
     fn get_epics(&self) -> Result<Vec<Epic>>;
+    fn create_epic(&self, name: String, description: String) -> Result<Epic>;
 }

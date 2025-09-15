@@ -6,15 +6,15 @@ fn test_cli_without_args() {
     let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     // The test expects specific error messages but in test environment we get terminal device errors
     // We'll accept either the expected messages or various terminal-related errors
-    cmd.assert()
-        .failure()
-        .stderr(
-            predicate::str::contains("No default workspace configured")
-                .or(predicate::str::contains("No configuration file found"))
-                .or(predicate::str::contains("Device not configured"))
-                .or(predicate::str::contains("Failed to initialize input reader"))
-                .or(predicate::str::contains("Error:"))  // Catch-all for terminal errors
-        );
+    cmd.assert().failure().stderr(
+        predicate::str::contains("No default workspace configured")
+            .or(predicate::str::contains("No configuration file found"))
+            .or(predicate::str::contains("Device not configured"))
+            .or(predicate::str::contains(
+                "Failed to initialize input reader",
+            ))
+            .or(predicate::str::contains("Error:")), // Catch-all for terminal errors
+    );
 }
 
 #[test]
@@ -47,7 +47,9 @@ fn test_cli_missing_token() {
         .arg("testuser")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Either --token or --workspace must be provided"));
+        .stderr(predicate::str::contains(
+            "Either --token or --workspace must be provided",
+        ));
 }
 
 #[test]
@@ -92,15 +94,12 @@ fn test_cli_add_requires_auth() {
     // In test environment, it will fail with "not a terminal" error
     // because it tries to use interactive prompts
     let mut cmd = Command::cargo_bin("sc-cli").unwrap();
-    cmd.arg("add")
-        .assert()
-        .failure()
-        .stderr(
-            predicate::str::contains("No default workspace configured")
-                .or(predicate::str::contains("No configuration file found"))
-                .or(predicate::str::contains("not a terminal"))
-                .or(predicate::str::contains("IO error"))
-        );
+    cmd.arg("add").assert().failure().stderr(
+        predicate::str::contains("No default workspace configured")
+            .or(predicate::str::contains("No configuration file found"))
+            .or(predicate::str::contains("not a terminal"))
+            .or(predicate::str::contains("IO error")),
+    );
 }
 
 #[test]
@@ -169,7 +168,9 @@ fn test_cli_finish_requires_auth() {
         .stderr(
             predicate::str::contains("No default workspace configured")
                 .or(predicate::str::contains("No configuration file found"))
-                .or(predicate::str::contains("Either --token or --workspace must be provided"))
+                .or(predicate::str::contains(
+                    "Either --token or --workspace must be provided",
+                )),
         );
 }
 
@@ -189,12 +190,14 @@ fn test_cli_global_all_flag() {
     // Test that --all flag is accepted globally with default command
     cmd.arg("--all")
         .assert()
-        .failure()  // Will fail due to no config, but should accept the flag
+        .failure() // Will fail due to no config, but should accept the flag
         .stderr(
             predicate::str::contains("No default workspace configured")
                 .or(predicate::str::contains("No configuration file found"))
                 .or(predicate::str::contains("Device not configured"))
-                .or(predicate::str::contains("Failed to initialize input reader"))
-                .or(predicate::str::contains("Error:"))  // Catch-all for terminal errors
+                .or(predicate::str::contains(
+                    "Failed to initialize input reader",
+                ))
+                .or(predicate::str::contains("Error:")), // Catch-all for terminal errors
         );
 }

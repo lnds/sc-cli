@@ -34,7 +34,7 @@ mod tests {
         });
 
         let story: Story = serde_json::from_value(json_data).unwrap();
-        
+
         assert_eq!(story.id, 123);
         assert_eq!(story.name, "Test Story");
         assert_eq!(story.description, "A test story description");
@@ -62,7 +62,7 @@ mod tests {
         });
 
         let story: Story = serde_json::from_value(json_data).unwrap();
-        
+
         assert_eq!(story.id, 123);
         assert_eq!(story.name, "Minimal Story");
         assert_eq!(story.description, "");
@@ -84,7 +84,7 @@ mod tests {
         });
 
         let workflow: Workflow = serde_json::from_value(json_data).unwrap();
-        
+
         assert_eq!(workflow.id, 1);
         assert_eq!(workflow.name, "Default Workflow");
         assert_eq!(workflow.states.len(), 3);
@@ -124,7 +124,7 @@ mod tests {
         });
 
         let response: SearchResponse = serde_json::from_value(json_data).unwrap();
-        
+
         assert_eq!(response.stories.data.len(), 2);
         assert_eq!(response.stories.data[0].id, 1);
         assert_eq!(response.stories.data[0].name, "Story 1");

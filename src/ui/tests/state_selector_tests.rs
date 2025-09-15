@@ -22,7 +22,7 @@ mod tests {
             completed_at: None,
             moved_at: None,
             comments: vec![],
-                formatted_vcs_branch_name: None,
+            formatted_vcs_branch_name: None,
             epic_id: None,
         }
     }
@@ -131,7 +131,7 @@ mod tests {
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         app.toggle_state_selector();
-        
+
         // First available state should be "In Progress" (id: 20)
         assert_eq!(app.get_selected_target_state(), Some(20));
 

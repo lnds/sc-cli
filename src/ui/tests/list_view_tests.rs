@@ -24,7 +24,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 2,
@@ -42,7 +42,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
             Story {
                 id: 3,
@@ -60,7 +60,7 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             },
         ]
     }
@@ -104,7 +104,7 @@ mod tests {
         // Should start in column view mode
         assert!(!app.list_view_mode);
         assert_eq!(app.list_selected_index, 0);
-        
+
         // all_stories_list should be populated and sorted by position
         assert_eq!(app.all_stories_list.len(), 3);
         // Should be sorted by position: Story 3 (500), Story 1 (1000), Story 2 (2000)
@@ -177,7 +177,7 @@ mod tests {
 
         // Switch to list view
         app.toggle_view_mode();
-        
+
         // Should select first story in sorted order (Story 3 with position 500)
         let selected = app.get_selected_story().unwrap();
         assert_eq!(selected.id, 3);
@@ -274,26 +274,24 @@ mod tests {
         assert_eq!(app.all_stories_list.len(), 3);
 
         // Add new stories via merge_stories
-        let new_stories = vec![
-            Story {
-                id: 4,
-                name: "Fourth Story".to_string(),
-                description: "Fourth description".to_string(),
-                workflow_state_id: 10,
-                app_url: "https://app.shortcut.com/org/story/4".to_string(),
-                story_type: "feature".to_string(),
-                labels: vec![],
-                owner_ids: vec!["user4".to_string()],
-                position: 100, // Should be first in sorted order
-                created_at: "2024-01-01T00:00:00Z".to_string(),
-                updated_at: "2024-01-02T00:00:00Z".to_string(),
-                completed_at: None,
-                moved_at: None,
-                comments: vec![],
-                formatted_vcs_branch_name: None,
+        let new_stories = vec![Story {
+            id: 4,
+            name: "Fourth Story".to_string(),
+            description: "Fourth description".to_string(),
+            workflow_state_id: 10,
+            app_url: "https://app.shortcut.com/org/story/4".to_string(),
+            story_type: "feature".to_string(),
+            labels: vec![],
+            owner_ids: vec!["user4".to_string()],
+            position: 100, // Should be first in sorted order
+            created_at: "2024-01-01T00:00:00Z".to_string(),
+            updated_at: "2024-01-02T00:00:00Z".to_string(),
+            completed_at: None,
+            moved_at: None,
+            comments: vec![],
+            formatted_vcs_branch_name: None,
             epic_id: None,
-            },
-        ];
+        }];
 
         app.merge_stories(new_stories, None);
 
@@ -321,7 +319,8 @@ mod tests {
             modifiers: crossterm::event::KeyModifiers::NONE,
             kind: crossterm::event::KeyEventKind::Press,
             state: crossterm::event::KeyEventState::NONE,
-        }).unwrap();
+        })
+        .unwrap();
 
         // Should now be in list view mode
         assert!(app.list_view_mode);
@@ -332,7 +331,8 @@ mod tests {
             modifiers: crossterm::event::KeyModifiers::NONE,
             kind: crossterm::event::KeyEventKind::Press,
             state: crossterm::event::KeyEventState::NONE,
-        }).unwrap();
+        })
+        .unwrap();
 
         // Should be back to column view
         assert!(!app.list_view_mode);
@@ -346,7 +346,7 @@ mod tests {
 
         // Switch to list view
         app.toggle_view_mode();
-        
+
         // Initial scroll offset should be 0
         assert_eq!(app.list_scroll_offset, 0);
         assert_eq!(app.list_selected_index, 0);
@@ -359,11 +359,11 @@ mod tests {
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         app.toggle_view_mode();
-        
+
         // With a large visible height (20), all stories should be visible
         app.update_list_scroll(20); // 20 lines visible = 10 stories visible
         assert_eq!(app.list_scroll_offset, 0);
-        
+
         // Navigate to last story
         app.list_selected_index = 2;
         app.update_list_scroll(20);
@@ -391,29 +391,29 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             });
         }
-        
+
         let workflows = create_test_workflows();
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         app.toggle_view_mode();
-        
+
         // With visible height 6, only 3 stories visible (6 lines / 2 lines per story)
         app.update_list_scroll(6);
         assert_eq!(app.list_scroll_offset, 0);
-        
+
         // Navigate to story index 4 (should trigger scrolling)
         app.list_selected_index = 4;
         app.update_list_scroll(6);
         assert_eq!(app.list_scroll_offset, 2); // Should scroll to keep selected item visible
-        
+
         // Navigate to story index 10
         app.list_selected_index = 10;
         app.update_list_scroll(6);
         assert_eq!(app.list_scroll_offset, 8); // Should scroll further
-        
+
         // Navigate back to beginning
         app.list_selected_index = 0;
         app.update_list_scroll(6);
@@ -441,21 +441,21 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             });
         }
-        
+
         let workflows = create_test_workflows();
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         app.toggle_view_mode();
-        
+
         // With visible height 4, only 2 stories visible
         // Total stories: 9, visible: 2, max scroll offset: 9 - 2 = 7
         app.list_selected_index = 8; // Last story
         app.update_list_scroll(4);
         assert_eq!(app.list_scroll_offset, 7); // Max scroll to show last story
-        
+
         // Try to scroll beyond bounds
         app.list_scroll_offset = 100;
         app.update_list_scroll(4);
@@ -482,10 +482,10 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             });
         }
-        
+
         let workflows = create_test_workflows();
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
@@ -494,11 +494,11 @@ mod tests {
         app.list_selected_index = 5;
         app.update_list_scroll(4);
         assert!(app.list_scroll_offset > 0);
-        
+
         // Toggle back to column view
         app.toggle_view_mode();
         assert!(!app.list_view_mode);
-        
+
         // Toggle back to list view - scroll should be reset
         app.toggle_view_mode();
         assert!(app.list_view_mode);
@@ -526,37 +526,37 @@ mod tests {
                 moved_at: None,
                 comments: vec![],
                 formatted_vcs_branch_name: None,
-            epic_id: None,
+                epic_id: None,
             });
         }
-        
+
         let workflows = create_test_workflows();
         let mut app = App::new(stories, workflows, "test query".to_string(), None);
 
         app.toggle_view_mode();
-        
+
         // Navigate through list
         assert_eq!(app.list_selected_index, 0);
-        
+
         app.next();
         assert_eq!(app.list_selected_index, 1);
-        
+
         app.next();
         assert_eq!(app.list_selected_index, 2);
-        
+
         // Navigate to end and wrap around
         for _ in 0..4 {
             app.next();
         }
         assert_eq!(app.list_selected_index, 6); // Last story
-        
+
         app.next(); // Should wrap to beginning
         assert_eq!(app.list_selected_index, 0);
-        
+
         // Navigate backwards
         app.previous(); // Should wrap to end
         assert_eq!(app.list_selected_index, 6);
-        
+
         app.previous();
         assert_eq!(app.list_selected_index, 5);
     }

@@ -50,7 +50,7 @@ mod api_integration_tests {
     #[test]
     fn test_mock_api_workflow() {
         let mut server = Server::new();
-        
+
         // Mock workflows endpoint
         let workflows_response = json!([
             {
@@ -64,7 +64,8 @@ mod api_integration_tests {
             }
         ]);
 
-        let _workflows_mock = server.mock("GET", "/workflows")
+        let _workflows_mock = server
+            .mock("GET", "/workflows")
             .match_header("Shortcut-Token", "test-token")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -93,8 +94,12 @@ mod api_integration_tests {
             }
         });
 
-        let _search_mock = server.mock("GET", "/search")
-            .match_query(mockito::Matcher::UrlEncoded("query".to_string(), "owner:testuser is:story".to_string()))
+        let _search_mock = server
+            .mock("GET", "/search")
+            .match_query(mockito::Matcher::UrlEncoded(
+                "query".to_string(),
+                "owner:testuser is:story".to_string(),
+            ))
             .match_header("Shortcut-Token", "test-token")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -119,12 +124,14 @@ mod api_integration_tests {
                 "stories": {
                     "data": []
                 }
-            }).to_string()
+            })
+            .to_string()
         } else {
             "Error response".to_string()
         };
 
-        let _mock = server.mock("GET", "/search")
+        let _mock = server
+            .mock("GET", "/search")
             .match_query(mockito::Matcher::Any)
             .with_status(status_code)
             .with_body(response_body)

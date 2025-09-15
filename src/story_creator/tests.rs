@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use crate::api::{ShortcutApi, Story, Workflow, Member, CurrentMember, Epic};
+    use crate::api::{CurrentMember, Epic, Member, ShortcutApi, Story, Workflow};
     use anyhow::Result;
 
     struct MockApi {
@@ -34,7 +34,14 @@ mod tests {
             unimplemented!()
         }
 
-        fn update_story_details(&self, _story_id: i64, _name: String, _description: String, _story_type: String, _epic_id: Option<i64>) -> Result<Story> {
+        fn update_story_details(
+            &self,
+            _story_id: i64,
+            _name: String,
+            _description: String,
+            _story_type: String,
+            _epic_id: Option<i64>,
+        ) -> Result<Story> {
             unimplemented!()
         }
 
@@ -42,11 +49,23 @@ mod tests {
             unimplemented!()
         }
 
-        fn search_stories_page(&self, _query: &str, _next_token: Option<String>) -> Result<crate::api::SearchStoriesResult> {
+        fn search_stories_page(
+            &self,
+            _query: &str,
+            _next_token: Option<String>,
+        ) -> Result<crate::api::SearchStoriesResult> {
             unimplemented!()
         }
 
-        fn create_story(&self, _name: String, _description: String, _story_type: String, _requested_by_id: String, _workflow_state_id: i64, _epic_id: Option<i64>) -> Result<Story> {
+        fn create_story(
+            &self,
+            _name: String,
+            _description: String,
+            _story_type: String,
+            _requested_by_id: String,
+            _workflow_state_id: i64,
+            _epic_id: Option<i64>,
+        ) -> Result<Story> {
             if self.should_fail {
                 Err(anyhow::anyhow!("API Error"))
             } else {
@@ -66,7 +85,7 @@ mod tests {
             "Test Description".to_string(),
             "feature".to_string(),
             "user-123".to_string(),
-            456
+            456,
         );
 
         assert_eq!(creator.name, "Test Story");
@@ -106,12 +125,12 @@ mod tests {
             "Test Description".to_string(),
             "feature".to_string(),
             "user-123".to_string(),
-            456
+            456,
         );
 
         let result = creator.create(&mock_api);
         assert!(result.is_ok());
-        
+
         let created_story = result.unwrap();
         assert_eq!(created_story.id, 123);
         assert_eq!(created_story.name, "Test Story");
@@ -148,11 +167,16 @@ mod tests {
             "Test Description".to_string(),
             "feature".to_string(),
             "user-123".to_string(),
-            456
+            456,
         );
 
         let result = creator.create(&mock_api);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Failed to create story"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to create story")
+        );
     }
 }

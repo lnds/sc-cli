@@ -1,4 +1,4 @@
-use crate::api::{client::ShortcutClient, ShortcutApi};
+use crate::api::{ShortcutApi, client::ShortcutClient};
 use serde_json::json;
 
 #[cfg(test)]
@@ -19,7 +19,7 @@ mod tests {
     fn test_search_stories_success() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
+
         let mock_response = json!({
             "stories": {
                 "data": [
@@ -40,8 +40,12 @@ mod tests {
             }
         });
 
-        let _m = server.mock("GET", "/search")
-            .match_query(mockito::Matcher::UrlEncoded("query".to_string(), "owner:test".to_string()))
+        let _m = server
+            .mock("GET", "/search")
+            .match_query(mockito::Matcher::UrlEncoded(
+                "query".to_string(),
+                "owner:test".to_string(),
+            ))
             .match_header("Shortcut-Token", "test-token")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -61,15 +65,19 @@ mod tests {
     fn test_search_stories_empty_results() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
+
         let mock_response = json!({
             "stories": {
                 "data": []
             }
         });
 
-        let _m = server.mock("GET", "/search")
-            .match_query(mockito::Matcher::UrlEncoded("query".to_string(), "owner:nobody".to_string()))
+        let _m = server
+            .mock("GET", "/search")
+            .match_query(mockito::Matcher::UrlEncoded(
+                "query".to_string(),
+                "owner:nobody".to_string(),
+            ))
             .match_header("Shortcut-Token", "test-token")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -86,8 +94,9 @@ mod tests {
     fn test_search_stories_api_error() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
-        let _m = server.mock("GET", "/search")
+
+        let _m = server
+            .mock("GET", "/search")
             .match_query(mockito::Matcher::Any)
             .with_status(401)
             .with_body("Unauthorized")
@@ -105,7 +114,7 @@ mod tests {
     fn test_get_workflows_success() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
+
         let mock_response = json!([
             {
                 "id": 1,
@@ -118,7 +127,8 @@ mod tests {
             }
         ]);
 
-        let _m = server.mock("GET", "/workflows")
+        let _m = server
+            .mock("GET", "/workflows")
             .match_header("Shortcut-Token", "test-token")
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -134,19 +144,19 @@ mod tests {
         assert_eq!(workflows[0].states.len(), 3);
     }
 
-
     #[test]
     fn test_debug_mode_output() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
+
         let mock_response = json!({
             "stories": {
                 "data": []
             }
         });
 
-        let _m = server.mock("GET", "/search")
+        let _m = server
+            .mock("GET", "/search")
             .match_query(mockito::Matcher::Any)
             .with_status(200)
             .with_header("content-type", "application/json")
@@ -164,12 +174,12 @@ mod tests {
         // In a real test environment, we'd capture stderr to verify output
         let _ = client.search_stories("owner:test", None).unwrap();
     }
-    
+
     #[test]
     fn test_create_story_success() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
+
         let mock_response = json!({
             "id": 999,
             "name": "Test Story Creation",
@@ -184,7 +194,8 @@ mod tests {
             "updated_at": "2024-01-01T00:00:00Z"
         });
 
-        let _m = server.mock("POST", "/stories")
+        let _m = server
+            .mock("POST", "/stories")
             .match_header("Shortcut-Token", "test-token")
             .match_body(mockito::Matcher::Json(json!({
                 "name": "Test Story Creation",
@@ -199,14 +210,16 @@ mod tests {
             .create();
 
         let client = create_test_client(&url);
-        let story = client.create_story(
-            "Test Story Creation".to_string(),
-            "This is a test description".to_string(),
-            "feature".to_string(),
-            "user-123".to_string(),
-            500,
-            None
-        ).unwrap();
+        let story = client
+            .create_story(
+                "Test Story Creation".to_string(),
+                "This is a test description".to_string(),
+                "feature".to_string(),
+                "user-123".to_string(),
+                500,
+                None,
+            )
+            .unwrap();
 
         assert_eq!(story.id, 999);
         assert_eq!(story.name, "Test Story Creation");
@@ -218,8 +231,9 @@ mod tests {
     fn test_create_story_api_error() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
-        let _m = server.mock("POST", "/stories")
+
+        let _m = server
+            .mock("POST", "/stories")
             .match_header("Shortcut-Token", "test-token")
             .with_status(400)
             .with_body(json!({"error": "Invalid story type"}).to_string())
@@ -232,7 +246,7 @@ mod tests {
             "invalid-type".to_string(),
             "user-123".to_string(),
             500,
-            None
+            None,
         );
 
         assert!(result.is_err());
@@ -244,7 +258,7 @@ mod tests {
     fn test_search_stories_with_limit() {
         let mut server = mockito::Server::new();
         let url = server.url();
-        
+
         // Create more stories than the limit
         let mut stories_data = Vec::new();
         for i in 1..=30 {
@@ -262,7 +276,7 @@ mod tests {
                 "updated_at": "2024-01-02T00:00:00Z"
             }));
         }
-        
+
         let mock_response = json!({
             "stories": {
                 "data": stories_data,
@@ -270,7 +284,8 @@ mod tests {
             }
         });
 
-        let _m = server.mock("GET", "/search")
+        let _m = server
+            .mock("GET", "/search")
             .match_query(mockito::Matcher::AllOf(vec![
                 mockito::Matcher::UrlEncoded("query".to_string(), "owner:test".to_string()),
                 mockito::Matcher::UrlEncoded("page_size".to_string(), "25".to_string()),
@@ -282,13 +297,13 @@ mod tests {
             .create();
 
         let client = create_test_client(&url);
-        
+
         // Test with limit
         let stories = client.search_stories("owner:test", Some(10)).unwrap();
         assert_eq!(stories.len(), 10);
         assert_eq!(stories[0].id, 1);
         assert_eq!(stories[9].id, 10);
-        
+
         // Test without limit
         let stories = client.search_stories("owner:test", None).unwrap();
         assert_eq!(stories.len(), 30);

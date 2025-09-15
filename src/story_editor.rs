@@ -1,6 +1,6 @@
-use anyhow::{Context, Result};
-use dialoguer::{Input, Select, Confirm};
 use crate::api::{ShortcutApi, Story};
+use anyhow::{Context, Result};
+use dialoguer::{Confirm, Input, Select};
 use std::io::{self, BufRead};
 
 #[cfg(test)]
@@ -56,17 +56,20 @@ impl StoryEditor {
             println!("\nEnter new description (press Enter twice to finish):");
             let mut description_lines = Vec::new();
             let mut empty_line_count = 0;
-            
+
             let stdin = io::stdin();
             let mut handle = stdin.lock();
-            
+
             loop {
                 let mut line = String::new();
                 handle.read_line(&mut line).context("Failed to read line")?;
-                
+
                 // Remove the newline character
-                let line = line.trim_end_matches('\n').trim_end_matches('\r').to_string();
-                
+                let line = line
+                    .trim_end_matches('\n')
+                    .trim_end_matches('\r')
+                    .to_string();
+
                 if line.is_empty() {
                     empty_line_count += 1;
                     if empty_line_count >= 2 {
@@ -78,12 +81,12 @@ impl StoryEditor {
                     description_lines.push(line);
                 }
             }
-            
+
             // Remove trailing empty lines
             while description_lines.last() == Some(&String::new()) {
                 description_lines.pop();
             }
-            
+
             description_lines.join("\n")
         } else {
             self.description.clone()
@@ -91,7 +94,8 @@ impl StoryEditor {
 
         // Edit story type
         let story_types = vec!["feature", "bug", "chore"];
-        let current_type_index = story_types.iter()
+        let current_type_index = story_types
+            .iter()
             .position(|&t| t == self.story_type)
             .unwrap_or(0);
 
@@ -105,9 +109,9 @@ impl StoryEditor {
         let new_story_type = story_types[story_type_index].to_string();
 
         // Check if anything changed
-        let changed = new_name != self.name || 
-                     new_description != self.description || 
-                     new_story_type != self.story_type;
+        let changed = new_name != self.name
+            || new_description != self.description
+            || new_story_type != self.story_type;
 
         if !changed {
             println!("\n📝 No changes made to the story.");
@@ -127,12 +131,14 @@ impl StoryEditor {
             println!("  Description: (empty)");
         } else {
             let first_line = self.description.lines().next().unwrap_or("");
-            println!("  Description: {}...", 
-                if first_line.len() > 50 { 
-                    &first_line[..50] 
-                } else { 
-                    first_line 
-                });
+            println!(
+                "  Description: {}...",
+                if first_line.len() > 50 {
+                    &first_line[..50]
+                } else {
+                    first_line
+                }
+            );
         }
 
         // Confirm changes
@@ -147,13 +153,14 @@ impl StoryEditor {
 
     /// Update the story using the API client
     pub fn update<T: ShortcutApi>(&self, client: &T) -> Result<Story> {
-        client.update_story_details(
-            self.story_id,
-            self.name.clone(),
-            self.description.clone(),
-            self.story_type.clone(),
-            None // Epic ID not supported in CLI story editor yet
-        )
-        .context("Failed to update story")
+        client
+            .update_story_details(
+                self.story_id,
+                self.name.clone(),
+                self.description.clone(),
+                self.story_type.clone(),
+                None, // Epic ID not supported in CLI story editor yet
+            )
+            .context("Failed to update story")
     }
 }

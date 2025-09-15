@@ -1739,6 +1739,16 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
         Line::from(""),
     ];
 
+    // Add epic information if present
+    if let Some(epic_id) = story.epic_id
+        && let Some(epic) = app.epics.iter().find(|e| e.id == epic_id) {
+            text_lines.push(Line::from(vec![
+                Span::styled("Epic: ", Style::default().add_modifier(Modifier::BOLD)),
+                Span::styled(&epic.name, Style::default().fg(Color::Magenta)),
+            ]));
+            text_lines.push(Line::from(""));
+        }
+
     // Add owners information
     if !story.owner_ids.is_empty() {
         let owner_names = app.get_owner_names(&story.owner_ids);

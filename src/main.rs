@@ -1125,6 +1125,59 @@ fn run_app(
             app.edit_story_requested = false;
         }
 
+        // Check if we need to create a new epic
+        if app.create_epic_requested
+            && !app
+                .create_epic_popup_state
+                .name_textarea
+                .lines()
+                .join("")
+                .trim()
+                .is_empty()
+        {
+            let name = app.create_epic_popup_state.name_textarea.lines().join("");
+            let description = app.create_epic_popup_state.description_textarea.lines().join("\n");
+
+            match client.create_epic(name, description) {
+                Ok(new_epic) => {
+                    // Add the new epic to our epic list
+                    app.epics.push(new_epic.clone());
+                    if debug {
+                        eprintln!("Successfully created epic: {}", new_epic.name);
+                    }
+                    // Reset the popup state
+                    app.create_epic_popup_state = ui::CreateEpicPopupState {
+                        name_textarea: {
+                            let mut textarea = tui_textarea::TextArea::default();
+                            textarea.set_cursor_line_style(ratatui::style::Style::default());
+                            textarea.set_block(
+                                ratatui::widgets::Block::default()
+                                    .borders(ratatui::widgets::Borders::ALL)
+                                    .title("Epic Name"),
+                            );
+                            textarea
+                        },
+                        description_textarea: {
+                            let mut textarea = tui_textarea::TextArea::default();
+                            textarea.set_cursor_line_style(ratatui::style::Style::default());
+                            textarea.set_block(
+                                ratatui::widgets::Block::default()
+                                    .borders(ratatui::widgets::Borders::ALL)
+                                    .title("Description"),
+                            );
+                            textarea
+                        },
+                        selected_field: ui::CreateEpicField::Name,
+                    };
+                }
+                Err(e) => {
+                    eprintln!("Failed to create epic: {e}");
+                }
+            }
+
+            app.create_epic_requested = false;
+        }
+
         // Check if we need to handle git branch creation
         if app.git_branch_requested {
             let branch_name = app.git_popup_state.branch_name_textarea.lines().join("");

@@ -76,6 +76,10 @@ mod tests {
         fn get_epics(&self) -> Result<Vec<Epic>> {
             Ok(Vec::new())
         }
+
+        fn create_epic(&self, _name: String, _description: String) -> Result<Epic> {
+            unimplemented!()
+        }
     }
 
     #[test]

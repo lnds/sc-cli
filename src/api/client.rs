@@ -603,4 +603,48 @@ impl ShortcutApi for ShortcutClient {
 
         Ok(epics)
     }
+
+    fn create_epic(&self, name: String, description: String) -> Result<Epic> {
+        let url = format!("{}/epics", self.base_url);
+
+        #[derive(Serialize, Debug)]
+        struct CreateEpicRequest {
+            name: String,
+            description: String,
+        }
+
+        let request_body = CreateEpicRequest { name, description };
+
+        if self.debug {
+            eprintln!("Creating epic: {:?}", request_body);
+        }
+
+        let response = self
+            .client
+            .post(&url)
+            .headers(self.headers())
+            .json(&request_body)
+            .send()
+            .context("Failed to send create epic request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Create epic response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to create epic: {}. Error: {}", status, error_text);
+        }
+
+        let epic: Epic = response.json().context("Failed to parse epic response")?;
+
+        if self.debug {
+            eprintln!("Successfully created epic: {}", epic.name);
+        }
+
+        Ok(epic)
+    }
 }

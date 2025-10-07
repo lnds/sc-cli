@@ -80,6 +80,10 @@ mod tests {
         fn create_epic(&self, _name: String, _description: String) -> Result<Epic> {
             unimplemented!()
         }
+
+        fn add_comment(&self, _story_id: i64, _text: &str) -> Result<()> {
+            unimplemented!()
+        }
     }
 
     #[test]

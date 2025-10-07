@@ -308,4 +308,55 @@ mod tests {
         let stories = client.search_stories("owner:test", None).unwrap();
         assert_eq!(stories.len(), 30);
     }
+
+    #[test]
+    fn test_add_comment_success() {
+        let mut server = mockito::Server::new();
+        let url = server.url();
+
+        let mock_response = json!({
+            "id": 456,
+            "text": "This is a test comment",
+            "author_id": "user-123",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        });
+
+        let _m = server
+            .mock("POST", "/stories/123/comments")
+            .match_header("Shortcut-Token", "test-token")
+            .match_header("content-type", "application/json")
+            .match_body(mockito::Matcher::Json(json!({
+                "text": "This is a test comment"
+            })))
+            .with_status(201)
+            .with_body(mock_response.to_string())
+            .create();
+
+        let client = create_test_client(&url);
+        let result = client.add_comment(123, "This is a test comment");
+
+        assert!(result.is_ok(), "Expected successful comment addition");
+    }
+
+    #[test]
+    fn test_add_comment_api_error() {
+        let mut server = mockito::Server::new();
+        let url = server.url();
+
+        let _m = server
+            .mock("POST", "/stories/999/comments")
+            .match_header("Shortcut-Token", "test-token")
+            .with_status(404)
+            .with_body(json!({"error": "Story not found"}).to_string())
+            .create();
+
+        let client = create_test_client(&url);
+        let result = client.add_comment(999, "Test comment");
+
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("Failed to add comment"));
+        assert!(error.to_string().contains("404"));
+    }
 }

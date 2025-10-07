@@ -120,11 +120,15 @@ user_id = "your.work.mention.name"
 - **o** - Take ownership of the selected story
 - **a** - Add a new story
 - **e** - Edit the selected story
+- **E** - Create or manage epic for the selected story
 - **g** - Create git branch for the selected story (in git repositories)
 - **v** - Toggle between column and list view modes
 - **n** - Load more stories (fetch next page)
+- **f** - Filter by epic
+- **?** - Show help
 - **Esc** - Close detail view or cancel state selection
 - **q** - Quit the application
+- **Mouse Click** - Click on URLs in the detail view to open them in your browser
 
 #### Moving Stories Between States
 
@@ -234,6 +238,22 @@ sc-cli add --token YOUR_API_TOKEN
 sc-cli add "Add user profile feature" --type feature -w work
 ```
 
+#### Adding Comments
+
+```bash
+# Add a comment to a story interactively (prompts for comment text)
+sc-cli comment 42 --workspace work
+
+# Provide comment text directly
+sc-cli comment 42 --message "Updated the API endpoint" -w work
+
+# With prefixed story ID
+sc-cli comment sc-42 -m "This is now ready for review" --workspace work
+
+# Using direct token instead of workspace
+sc-cli comment 42 --message "Fixed the bug" --token YOUR_API_TOKEN
+```
+
 #### Editing Stories
 
 ```bash
@@ -295,6 +315,11 @@ Note: The `--all`, `--owner`, and `--requester` flags are mutually exclusive. On
 - `story_id` - Story ID to mark as finished (e.g., 42 or sc-42)
 - `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
 
+#### Comment Command
+- `story_id` - Story ID to add comment to (e.g., 42 or sc-42)
+- `--message` / `-m` - Comment text (will prompt if not provided)
+- `--token` / `-t` - Your Shortcut API token (optional if using --workspace)
+
 #### Show Command
 - Same options as View command but displays stories in paginated terminal output instead of TUI
 
@@ -325,10 +350,14 @@ The TUI shows:
   - Name
   - Type
   - Workflow State
+  - Epic (if assigned)
   - Owners (shows owner names or "Unassigned")
   - Description
+  - Shortcut URL (clickable)
+  - Git Branches with URLs (clickable)
+  - Pull Requests with status indicators and URLs (clickable)
+  - Recent Commits with short hashes and URLs (clickable)
   - Comments (with author names and timestamps)
-  - Shortcut URL
   - Scrollable content when there are many comments or long descriptions
   - Scroll indicator showing current position
 - State selector dialog for moving stories between workflow states
@@ -355,6 +384,9 @@ sc-cli finish 42  # or sc-42
 # Edit an existing story
 sc-cli edit 42
 
+# Add a comment to a story
+sc-cli comment 42 --message "Ready for review"
+
 # Show stories in paginated terminal output
 sc-cli show --limit 10
 ```
@@ -368,6 +400,27 @@ When working in a git repository, the TUI provides additional functionality:
 - **Edit branch names** before creation using Tab or 'e' key
 - **Supports both normal and bare repositories** (uses git worktree for bare repos)
 - **Automatic branch naming** follows Shortcut conventions
+
+### Git Information Display
+
+The story detail view (accessed with Enter key) now displays comprehensive git information:
+
+- **Git Branches**: All associated branches with their remote URLs
+- **Pull Requests**: PRs linked to the story with status indicators:
+  - 🟢 Open - Active pull requests
+  - 🟡 Draft - Draft pull requests under development
+  - 🔴 Closed - Closed without merging
+  - 🟣 Merged - Successfully merged pull requests
+- **Recent Commits**: Last 5 commits with short hashes and links
+
+### Clickable URLs
+
+All URLs in the story detail view are now interactive:
+
+- **Click any URL** to open it in your default browser
+- **Underlined cyan text** indicates clickable links
+- **Works with**: Story URLs, branch URLs, PR URLs, and commit URLs
+- **Mouse support**: Enabled automatically in the TUI
 
 ## Development
 

@@ -196,6 +196,19 @@ enum Command {
         #[arg(short, long)]
         token: Option<String>,
     },
+    /// Add a comment to a story
+    Comment {
+        /// Story ID to comment on (e.g., 42 or sc-42)
+        story_id: String,
+
+        /// Comment message (will prompt if not provided)
+        #[arg(short, long)]
+        message: Option<String>,
+
+        /// Shortcut API token (optional if using workspace)
+        #[arg(short, long)]
+        token: Option<String>,
+    },
     /// Display the version of sc-cli
     Version,
 }
@@ -257,6 +270,11 @@ fn main() -> Result<()> {
         Some(Command::Edit { story_id, token }) => {
             handle_edit_command(args.workspace, token, story_id, args.debug)
         }
+        Some(Command::Comment {
+            story_id,
+            message,
+            token,
+        }) => handle_comment_command(args.workspace, token, story_id, message, args.debug),
         Some(Command::Version) => handle_version_command(),
         None => {
             // Default to view command when no subcommand is specified
@@ -626,6 +644,102 @@ fn handle_edit_command(
     println!("  Name: {}", updated_story.name);
     println!("  Type: {}", updated_story.story_type);
     println!("  URL: {}", updated_story.app_url);
+
+    Ok(())
+}
+
+fn handle_comment_command(
+    workspace: Option<String>,
+    token: Option<String>,
+    story_id: String,
+    message: Option<String>,
+    debug: bool,
+) -> Result<()> {
+    // Parse story ID (remove "sc-" prefix if present)
+    let story_id: i64 = story_id
+        .strip_prefix("sc-")
+        .unwrap_or(&story_id)
+        .parse()
+        .context(format!("Invalid story ID: {story_id}"))?;
+
+    // Get API token from command line or config
+    let token = if let Some(t) = token {
+        t
+    } else if let Some(ws) = workspace {
+        let (config, _created) =
+            Config::load_or_create(&ws).context("Failed to load or create config")?;
+        config
+            .get_workspace(&ws)
+            .with_context(|| format!("Workspace '{}' not found in config", ws))?
+            .api_key
+            .clone()
+    } else {
+        anyhow::bail!("No API token provided. Use --token or --workspace");
+    };
+
+    // Initialize API client
+    let client = ShortcutClient::new(token, debug).context("Failed to create Shortcut client")?;
+
+    if debug {
+        eprintln!("Fetching story #{story_id} to add comment...");
+    }
+
+    // Fetch the story to verify it exists
+    let story = client
+        .get_story(story_id)
+        .context(format!("Failed to fetch story #{story_id}"))?;
+
+    println!("\n💬 Adding comment to story:");
+    println!("  #{} - {}", story.id, story.name);
+
+    // Get the comment text
+    let comment_text = if let Some(msg) = message {
+        msg
+    } else {
+        // Prompt for comment if not provided
+        println!("\nEnter your comment (press Ctrl+D or Enter twice to submit):");
+
+        let mut lines = Vec::new();
+        let stdin = std::io::stdin();
+        let mut empty_line_count = 0;
+
+        loop {
+            let mut line = String::new();
+            match stdin.read_line(&mut line) {
+                Ok(0) => break, // EOF (Ctrl+D)
+                Ok(_) => {
+                    if line == "\n" {
+                        empty_line_count += 1;
+                        if empty_line_count >= 2 {
+                            break; // Two consecutive empty lines
+                        }
+                    } else {
+                        empty_line_count = 0;
+                    }
+                    lines.push(line);
+                }
+                Err(e) => return Err(anyhow::anyhow!("Failed to read input: {}", e)),
+            }
+        }
+
+        lines.join("").trim().to_string()
+    };
+
+    if comment_text.is_empty() {
+        anyhow::bail!("Comment cannot be empty");
+    }
+
+    if debug {
+        eprintln!("Posting comment ({} chars)...", comment_text.len());
+    }
+
+    // Add the comment via API
+    client
+        .add_comment(story_id, &comment_text)
+        .context("Failed to add comment")?;
+
+    println!("\n✅ Comment added successfully!");
+    println!("  View story: {}", story.app_url);
 
     Ok(())
 }

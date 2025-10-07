@@ -915,10 +915,9 @@ fn run_app(
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
-        if crossterm::event::poll(std::time::Duration::from_millis(50))?
-            && let crossterm::event::Event::Key(key) = crossterm::event::read()?
-            && key.kind == crossterm::event::KeyEventKind::Press
-        {
+        if crossterm::event::poll(std::time::Duration::from_millis(50))? {
+            match crossterm::event::read()? {
+                crossterm::event::Event::Key(key) if key.kind == crossterm::event::KeyEventKind::Press => {
             // Special handling for Enter in state selector
             if app.show_state_selector && key.code == crossterm::event::KeyCode::Enter {
                 let story_update = app
@@ -942,6 +941,12 @@ fn run_app(
             } else {
                 // Handle all other events normally
                 app.handle_key_event(key)?;
+            }
+                }
+                crossterm::event::Event::Mouse(mouse) => {
+                    app.handle_mouse_event(mouse)?;
+                }
+                _ => {}
             }
         }
 

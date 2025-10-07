@@ -1,7 +1,7 @@
 use crate::api::{Epic, Story, Workflow};
 use crate::git::GitContext;
 use chrono::{DateTime, Datelike, Duration, Utc, Weekday};
-use crossterm::event::{self, KeyCode};
+use crossterm::event::{self, KeyCode, MouseEventKind, MouseButton};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -139,6 +139,9 @@ pub struct App {
     pub show_create_epic_popup: bool,
     pub create_epic_popup_state: CreateEpicPopupState,
     pub create_epic_requested: bool,
+    // URL tracking for clickable links
+    pub clickable_urls: Vec<ClickableUrl>,   // URLs and their positions in the detail view
+    pub detail_area: Option<Rect>,           // The area of the detail popup for coordinate calculation
 }
 
 #[derive(Clone)]
@@ -170,6 +173,14 @@ pub struct EditPopupState {
     pub story_id: i64,
     pub epic_id: Option<i64>,
     pub epic_selector_index: usize, // 0 = None, 1+ = epic index
+}
+
+#[derive(Debug, Clone)]
+pub struct ClickableUrl {
+    pub url: String,
+    pub row: u16,     // Row in the detail popup (0-based)
+    pub start_col: u16, // Starting column of the URL
+    pub end_col: u16,   // Ending column of the URL
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -493,6 +504,8 @@ impl App {
                 selected_field: CreateEpicField::Name,
             },
             create_epic_requested: false,
+            clickable_urls: Vec::new(),
+            detail_area: None,
         }
     }
 
@@ -690,6 +703,41 @@ impl App {
         } else {
             None
         }
+    }
+
+    pub fn handle_mouse_event(&mut self, mouse: crossterm::event::MouseEvent) -> anyhow::Result<()> {
+        // Only handle clicks in the detail popup
+        if !self.show_detail || self.detail_area.is_none() {
+            return Ok(());
+        }
+
+        if let MouseEventKind::Down(MouseButton::Left) = mouse.kind {
+            let area = self.detail_area.unwrap();
+
+            // Check if click is within the detail popup area
+            if mouse.column >= area.x && mouse.column < area.x + area.width
+                && mouse.row >= area.y && mouse.row < area.y + area.height {
+
+                // Calculate relative position within the popup
+                let relative_row = mouse.row - area.y;
+
+                // Check if we clicked on any URL
+                for clickable_url in &self.clickable_urls {
+                    if clickable_url.row == relative_row
+                        && mouse.column >= area.x + clickable_url.start_col
+                        && mouse.column <= area.x + clickable_url.end_col {
+
+                        // Open the URL in the default browser
+                        if let Err(e) = open::that(&clickable_url.url) {
+                            eprintln!("Failed to open URL: {}", e);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn handle_key_event(&mut self, key: event::KeyEvent) -> anyhow::Result<()> {
@@ -1768,9 +1816,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 
     // Detail popup
     if app.show_detail
-        && let Some(story) = app.get_selected_story()
+        && let Some(story) = app.get_selected_story().cloned()
     {
-        draw_detail_popup(frame, story, app);
+        draw_detail_popup(frame, &story, app);
     }
 
     // State selector popup
@@ -1815,9 +1863,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     }
 }
 
-fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
+fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &mut App) {
     let area = centered_rect(80, 80, frame.area());
     frame.render_widget(Clear, area);
+
+    // Store the detail area and clear clickable URLs for this render
+    app.detail_area = Some(area);
+    app.clickable_urls.clear();
 
     let workflow_state = app
         .workflow_state_map
@@ -1888,10 +1940,127 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
     }
 
     text_lines.push(Line::from(""));
+    // Track main story URL
+    let url_line_index = text_lines.len();
     text_lines.push(Line::from(vec![
         Span::styled("URL: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::styled(&story.app_url, Style::default().fg(Color::Cyan)),
+        Span::styled(&story.app_url, Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED)),
     ]));
+    // Store URL position (will be adjusted for scroll later)
+    app.clickable_urls.push(ClickableUrl {
+        url: story.app_url.clone(),
+        row: url_line_index as u16,
+        start_col: 5, // "URL: " is 5 chars
+        end_col: 5 + story.app_url.len() as u16,
+    });
+
+    // Add git branches section
+    if !story.branches.is_empty() {
+        text_lines.push(Line::from(""));
+        text_lines.push(Line::from(vec![Span::styled(
+            "Git Branches:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]));
+        for branch in &story.branches {
+            let branch_line_index = text_lines.len();
+            let url_start = 2 + branch.name.len() + 3; // "  " + name + " - "
+            text_lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(&branch.name, Style::default().fg(Color::Green)),
+                Span::raw(" - "),
+                Span::styled(&branch.url, Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED)),
+            ]));
+            app.clickable_urls.push(ClickableUrl {
+                url: branch.url.clone(),
+                row: branch_line_index as u16,
+                start_col: url_start as u16,
+                end_col: (url_start + branch.url.len()) as u16,
+            });
+        }
+    }
+
+    // Add pull requests section
+    if !story.pull_requests.is_empty() {
+        text_lines.push(Line::from(""));
+        text_lines.push(Line::from(vec![Span::styled(
+            "Pull Requests:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]));
+        for pr in &story.pull_requests {
+            let status = if pr.merged {
+                Span::styled("merged", Style::default().fg(Color::Magenta))
+            } else if pr.closed {
+                Span::styled("closed", Style::default().fg(Color::Red))
+            } else if pr.draft {
+                Span::styled("draft", Style::default().fg(Color::Yellow))
+            } else {
+                Span::styled("open", Style::default().fg(Color::Green))
+            };
+
+            text_lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(&pr.title, Style::default().fg(Color::White)),
+                Span::raw(" ["),
+                status,
+                Span::raw("]"),
+            ]));
+            let pr_url_line_index = text_lines.len();
+            text_lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(&pr.url, Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED)),
+            ]));
+            app.clickable_urls.push(ClickableUrl {
+                url: pr.url.clone(),
+                row: pr_url_line_index as u16,
+                start_col: 4, // "    " is 4 chars
+                end_col: 4 + pr.url.len() as u16,
+            });
+        }
+    }
+
+    // Add commits section (show last 5 commits)
+    if !story.commits.is_empty() {
+        text_lines.push(Line::from(""));
+        text_lines.push(Line::from(vec![Span::styled(
+            "Recent Commits:",
+            Style::default().add_modifier(Modifier::BOLD),
+        )]));
+        let recent_commits: Vec<_> = story.commits.iter().take(5).collect();
+        for commit in recent_commits {
+            let short_hash = if commit.hash.len() > 7 {
+                &commit.hash[..7]
+            } else {
+                &commit.hash
+            };
+            let first_line = commit.message.lines().next().unwrap_or(&commit.message);
+            text_lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(short_hash, Style::default().fg(Color::Yellow)),
+                Span::raw(" - "),
+                Span::raw(first_line),
+            ]));
+            let commit_url_line_index = text_lines.len();
+            text_lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled(&commit.url, Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED)),
+            ]));
+            app.clickable_urls.push(ClickableUrl {
+                url: commit.url.clone(),
+                row: commit_url_line_index as u16,
+                start_col: 4, // "    " is 4 chars
+                end_col: 4 + commit.url.len() as u16,
+            });
+        }
+        if story.commits.len() > 5 {
+            text_lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    format!("... and {} more commits", story.commits.len() - 5),
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+        }
+    }
 
     // Add comments section
     if !story.comments.is_empty() {
@@ -1952,6 +2121,18 @@ fn draw_detail_popup(frame: &mut Frame, story: &Story, app: &App) {
     } else {
         text_lines
     };
+
+    // Adjust clickable URL positions based on scroll offset
+    // Only keep URLs that are visible and adjust their row positions
+    app.clickable_urls.retain_mut(|url| {
+        if url.row >= start_line as u16 && url.row < end_line as u16 {
+            // Adjust row to be relative to visible area (add 1 for border)
+            url.row = (url.row - start_line as u16) + 1;
+            true
+        } else {
+            false
+        }
+    });
 
     // Create title with scroll indicator
     let scroll_indicator = if total_lines > content_height {

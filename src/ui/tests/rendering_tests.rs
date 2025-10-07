@@ -25,6 +25,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
             epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ];
 
@@ -179,6 +182,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 2,
@@ -197,6 +203,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ];
 
@@ -268,6 +277,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
             epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 2,
@@ -286,6 +298,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
             epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ];
 
@@ -351,6 +366,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 2,
@@ -369,6 +387,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ];
 

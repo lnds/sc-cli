@@ -25,6 +25,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 2,
@@ -43,6 +46,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 3,
@@ -61,6 +67,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ]
     }
@@ -291,6 +300,9 @@ mod tests {
             comments: vec![],
             formatted_vcs_branch_name: None,
             epic_id: None,
+            branches: vec![],
+            pull_requests: vec![],
+            commits: vec![],
         }];
 
         app.merge_stories(new_stories, None);
@@ -392,6 +404,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             });
         }
 
@@ -442,6 +457,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             });
         }
 
@@ -483,6 +501,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             });
         }
 
@@ -527,6 +548,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             });
         }
 

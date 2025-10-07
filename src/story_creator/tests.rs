@@ -117,6 +117,9 @@ mod tests {
             comments: vec![],
             formatted_vcs_branch_name: None,
             epic_id: None,
+            branches: vec![],
+            pull_requests: vec![],
+            commits: vec![],
         };
 
         let mock_api = MockApi {
@@ -159,6 +162,9 @@ mod tests {
             comments: vec![],
             formatted_vcs_branch_name: None,
             epic_id: None,
+            branches: vec![],
+            pull_requests: vec![],
+            commits: vec![],
         };
 
         let mock_api = MockApi {

@@ -33,6 +33,56 @@ pub struct Story {
     pub formatted_vcs_branch_name: Option<String>,
     #[serde(default)]
     pub epic_id: Option<i64>,
+    #[serde(default)]
+    pub branches: Vec<Branch>,
+    #[serde(default)]
+    pub pull_requests: Vec<PullRequest>,
+    #[serde(default)]
+    pub commits: Vec<Commit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Branch {
+    pub id: i64,
+    pub name: String,
+    pub url: String,
+    #[serde(default)]
+    pub repository_id: Option<i64>,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PullRequest {
+    pub id: i64,
+    pub title: String,
+    pub url: String,
+    #[serde(default)]
+    pub number: Option<i64>,
+    #[serde(default)]
+    pub draft: bool,
+    #[serde(default)]
+    pub closed: bool,
+    #[serde(default)]
+    pub merged: bool,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Commit {
+    pub id: i64,
+    pub hash: String,
+    pub message: String,
+    pub url: String,
+    #[serde(default)]
+    pub author_id: Option<String>,
+    #[serde(default)]
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -25,6 +25,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 2,
@@ -43,6 +46,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 3,
@@ -61,6 +67,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ]
     }
@@ -265,6 +274,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 1,
@@ -283,6 +295,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 2,
@@ -301,6 +316,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ];
 
@@ -451,6 +469,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
             Story {
                 id: 2,
@@ -469,6 +490,9 @@ mod tests {
                 comments: vec![],
                 formatted_vcs_branch_name: None,
                 epic_id: None,
+                branches: vec![],
+                pull_requests: vec![],
+                commits: vec![],
             },
         ];
 
@@ -531,6 +555,9 @@ mod tests {
             comments: vec![],
             formatted_vcs_branch_name: None,
             epic_id: None,
+            branches: vec![],
+            pull_requests: vec![],
+            commits: vec![],
         }];
 
         let workflows = vec![Workflow {
@@ -621,6 +648,9 @@ mod tests {
             comments: vec![],
             formatted_vcs_branch_name: None,
             epic_id: None,
+            branches: vec![],
+            pull_requests: vec![],
+            commits: vec![],
         }];
 
         let workflows = vec![Workflow {

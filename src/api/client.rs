@@ -647,4 +647,47 @@ impl ShortcutApi for ShortcutClient {
 
         Ok(epic)
     }
+
+    fn add_comment(&self, story_id: i64, text: &str) -> Result<()> {
+        let url = format!("{}/stories/{}/comments", self.base_url, story_id);
+
+        #[derive(Serialize, Debug)]
+        struct AddCommentRequest {
+            text: String,
+        }
+
+        let request_body = AddCommentRequest {
+            text: text.to_string(),
+        };
+
+        if self.debug {
+            eprintln!("Adding comment to story #{}: {} chars", story_id, text.len());
+        }
+
+        let response = self
+            .client
+            .post(&url)
+            .headers(self.headers())
+            .json(&request_body)
+            .send()
+            .context("Failed to send comment request")?;
+
+        let status = response.status();
+        if self.debug {
+            eprintln!("Add comment response status: {status}");
+        }
+
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            anyhow::bail!("Failed to add comment: {}. Error: {}", status, error_text);
+        }
+
+        if self.debug {
+            eprintln!("Successfully added comment to story #{}", story_id);
+        }
+
+        Ok(())
+    }
 }

@@ -213,4 +213,5 @@ pub trait ShortcutApi {
     ) -> Result<Story>;
     fn get_epics(&self) -> Result<Vec<Epic>>;
     fn create_epic(&self, name: String, description: String) -> Result<Epic>;
+    fn add_comment(&self, story_id: i64, text: &str) -> Result<()>;
 }

@@ -116,6 +116,7 @@ user_id = "your.work.mention.name"
 - **←/h** - Move to previous column (workflow state)
 - **→/l** - Move to next column (workflow state)
 - **Enter** - View story details
+- **c** - Add a comment to the selected story (when viewing details)
 - **Space** - Move story to a different workflow state
 - **o** - Take ownership of the selected story
 - **a** - Add a new story
@@ -174,6 +175,17 @@ When you press **e** on a selected story:
 - Press **Enter** on the Type field to save changes
 - Press **Esc** at any time to cancel without saving
 - Changes are immediately updated in Shortcut and reflected in the UI
+
+#### Adding Comments in TUI
+
+When viewing a story detail (press **Enter** on a story), you can add comments directly from the TUI:
+
+1. Press **c** while in the detail view
+2. A comment popup appears with a text area
+3. Type your comment (supports multi-line text - press Enter for new lines)
+4. Press **Tab** to submit the comment
+5. Press **Esc** to cancel without adding the comment
+6. The story will refresh to show the new comment in the detail view
 
 #### Loading More Stories (Pagination)
 

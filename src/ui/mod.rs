@@ -142,6 +142,10 @@ pub struct App {
     // URL tracking for clickable links
     pub clickable_urls: Vec<ClickableUrl>,   // URLs and their positions in the detail view
     pub detail_area: Option<Rect>,           // The area of the detail popup for coordinate calculation
+    // Comment popup state
+    pub show_comment_popup: bool,
+    pub comment_popup_state: CommentPopupState,
+    pub add_comment_requested: bool,
 }
 
 #[derive(Clone)]
@@ -202,6 +206,12 @@ pub struct CreateEpicPopupState {
 pub enum CreateEpicField {
     Name,
     Description,
+}
+
+#[derive(Clone)]
+pub struct CommentPopupState {
+    pub comment_textarea: TextArea<'static>,
+    pub story_id: i64,
 }
 
 #[derive(Clone)]
@@ -506,6 +516,17 @@ impl App {
             create_epic_requested: false,
             clickable_urls: Vec::new(),
             detail_area: None,
+            show_comment_popup: false,
+            comment_popup_state: CommentPopupState {
+                comment_textarea: {
+                    let mut ta = TextArea::default();
+                    ta.set_cursor_line_style(Style::default());
+                    ta.set_placeholder_text("Enter your comment here...");
+                    ta
+                },
+                story_id: 0,
+            },
+            add_comment_requested: false,
         }
     }
 
@@ -1082,6 +1103,50 @@ impl App {
                 }
                 _ => {}
             }
+        } else if self.show_comment_popup {
+            // Handle comment popup input
+            match key.code {
+                KeyCode::Esc => {
+                    self.show_comment_popup = false;
+                    self.comment_popup_state = CommentPopupState {
+                        comment_textarea: {
+                            let mut ta = TextArea::default();
+                            ta.set_cursor_line_style(Style::default());
+                            ta.set_placeholder_text("Enter your comment here...");
+                            ta
+                        },
+                        story_id: 0,
+                    };
+                }
+                KeyCode::Tab => {
+                    // Submit with Tab (primary method)
+                    let comment_text = self.comment_popup_state.comment_textarea.lines().join("\n");
+                    if !comment_text.trim().is_empty() {
+                        self.add_comment_requested = true;
+                        self.show_comment_popup = false;
+                    }
+                }
+                KeyCode::Enter => {
+                    // Check for any Enter key press
+                    if key.modifiers.contains(event::KeyModifiers::CONTROL)
+                        || key.modifiers.contains(event::KeyModifiers::ALT)
+                        || key.modifiers.contains(event::KeyModifiers::SHIFT) {
+                        // Submit with any modifier + Enter
+                        let comment_text = self.comment_popup_state.comment_textarea.lines().join("\n");
+                        if !comment_text.trim().is_empty() {
+                            self.add_comment_requested = true;
+                            self.show_comment_popup = false;
+                        }
+                    } else {
+                        // Regular Enter - add newline
+                        self.comment_popup_state.comment_textarea.input(convert_key_to_ratatui(key));
+                    }
+                }
+                _ => {
+                    // Pass through to textarea
+                    self.comment_popup_state.comment_textarea.input(convert_key_to_ratatui(key));
+                }
+            }
         } else if self.show_create_epic_popup {
             // Handle create epic popup input
             match key.code {
@@ -1392,6 +1457,21 @@ impl App {
                 KeyCode::Esc if self.show_detail => {
                     self.show_detail = false;
                     self.detail_scroll_offset = 0;
+                }
+                KeyCode::Char('c') if self.show_detail => {
+                    // Open comment popup for the current story
+                    if let Some(story_id) = self.get_selected_story().map(|s| s.id) {
+                        self.show_comment_popup = true;
+                        self.comment_popup_state = CommentPopupState {
+                            comment_textarea: {
+                                let mut ta = TextArea::default();
+                                ta.set_cursor_line_style(Style::default());
+                                ta.set_placeholder_text("Enter your comment here...");
+                                ta
+                            },
+                            story_id,
+                        };
+                    }
                 }
                 // Regular navigation (less specific patterns)
                 KeyCode::Char('j') | KeyCode::Down => self.next(),
@@ -1836,6 +1916,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     // Create epic popup
     if app.show_create_epic_popup {
         draw_create_epic_popup(frame, app);
+    }
+
+    // Comment popup
+    if app.show_comment_popup {
+        draw_comment_popup(frame, app);
     }
 
     // Edit story popup
@@ -2352,6 +2437,52 @@ fn draw_create_popup(frame: &mut Frame, app: &App) {
         .style(Style::default().fg(Color::DarkGray))
         .alignment(Alignment::Center);
     frame.render_widget(help, chunks[5]);
+}
+
+fn draw_comment_popup(frame: &mut Frame, app: &App) {
+    let area = centered_rect(60, 30, frame.area());
+    frame.render_widget(Clear, area);
+
+    // Create the main popup block
+    let popup = Block::default()
+        .title(format!("Add Comment to Story #{}", app.comment_popup_state.story_id))
+        .borders(Borders::ALL)
+        .style(Style::default().bg(Color::Black).fg(Color::White));
+    frame.render_widget(popup, area);
+
+    // Create inner area for text area
+    let inner = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+
+    // Layout for comment field and help text
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(5),    // Comment field
+            Constraint::Length(2), // Help text
+        ])
+        .split(inner);
+
+    // Comment field - render TextArea widget
+    let mut comment_textarea = app.comment_popup_state.comment_textarea.clone();
+    comment_textarea.set_block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Comment")
+            .border_style(Style::default().fg(Color::Yellow))
+    );
+    comment_textarea.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
+    frame.render_widget(&comment_textarea, chunks[0]);
+
+    // Help text
+    let help = Paragraph::new("Tab: Submit | Enter: New line | Esc: Cancel")
+        .style(Style::default().fg(Color::DarkGray))
+        .alignment(Alignment::Center);
+    frame.render_widget(help, chunks[1]);
 }
 
 fn draw_create_epic_popup(frame: &mut Frame, app: &App) {

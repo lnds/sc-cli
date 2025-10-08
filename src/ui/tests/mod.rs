@@ -1,4 +1,5 @@
 mod app_tests;
+mod comment_popup_tests;
 mod edit_story_tests;
 mod list_view_tests;
 mod pagination_tests;

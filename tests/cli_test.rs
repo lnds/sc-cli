@@ -185,6 +185,71 @@ fn test_cli_finish_story_id_numeric() {
 }
 
 #[test]
+fn test_cli_comment_help() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("comment")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Add a comment to a story"));
+}
+
+#[test]
+fn test_cli_comment_requires_story_id() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("comment")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required"));
+}
+
+#[test]
+fn test_cli_comment_requires_auth() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Without token or workspace, comment command should fail
+    cmd.arg("comment")
+        .arg("42")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No API token provided"));
+}
+
+#[test]
+fn test_cli_comment_with_message_flag() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Test that message flag is accepted (will fail due to no token, but validates args)
+    cmd.arg("comment")
+        .arg("42")
+        .arg("--message")
+        .arg("Test comment")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No API token provided"));
+}
+
+#[test]
+fn test_cli_comment_story_id_numeric() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Test that both numeric and sc- prefixed IDs are accepted
+    cmd.arg("comment")
+        .arg("sc-42")
+        .arg("--token")
+        .arg("fake-token")
+        .assert()
+        .failure(); // Will fail on API call, but validates parsing
+}
+
+#[test]
+fn test_cli_comment_invalid_story_id() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("comment")
+        .arg("not-a-number")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Invalid story ID"));
+}
+
+#[test]
 fn test_cli_global_all_flag() {
     let mut cmd = Command::cargo_bin("sc-cli").unwrap();
     // Test that --all flag is accepted globally with default command

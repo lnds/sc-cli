@@ -1244,6 +1244,43 @@ fn run_app(
             app.edit_story_requested = false;
         }
 
+        // Check if we need to add a comment
+        if app.add_comment_requested {
+            let comment_text = app.comment_popup_state.comment_textarea.lines().join("\n");
+            let story_id = app.comment_popup_state.story_id;
+
+            if !comment_text.trim().is_empty() {
+                match client.add_comment(story_id, &comment_text) {
+                    Ok(_) => {
+                        if debug {
+                            eprintln!("✅ Comment added to story #{}", story_id);
+                        }
+                        // Refresh the story to show the new comment
+                        if let Ok(updated_story) = client.get_story(story_id) {
+                            update_story_state(&mut app, story_id, updated_story);
+                        }
+                    }
+                    Err(e) => {
+                        if debug {
+                            eprintln!("⚠️ Failed to add comment: {}", e);
+                        }
+                    }
+                }
+            }
+
+            // Reset comment state
+            app.add_comment_requested = false;
+            app.comment_popup_state = ui::CommentPopupState {
+                comment_textarea: {
+                    let mut ta = tui_textarea::TextArea::default();
+                    ta.set_cursor_line_style(ratatui::style::Style::default());
+                    ta.set_placeholder_text("Enter your comment here...");
+                    ta
+                },
+                story_id: 0,
+            };
+        }
+
         // Check if we need to create a new epic
         if app.create_epic_requested
             && !app

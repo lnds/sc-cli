@@ -1,3 +1,5 @@
+[![Built With Ratatui](https://ratatui.rs/built-with-ratatui/badge.svg)](https://ratatui.rs/)
+
 # Shortcut CLI & TUI
 
 A command-line interface and interactive terminal UI for managing Shortcut stories via their API.

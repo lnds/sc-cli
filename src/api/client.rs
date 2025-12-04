@@ -94,8 +94,32 @@ impl ShortcutApi for ShortcutClient {
                 );
             }
 
-            let search_response: SearchResponse =
-                serde_json::from_str(&response_text).context("Failed to parse search response")?;
+            let search_response: SearchResponse = match serde_json::from_str(&response_text) {
+                Ok(resp) => resp,
+                Err(e) => {
+                    if self.debug {
+                        eprintln!("JSON parsing error: {e}");
+                        eprintln!("Full response length: {} chars", response_text.len());
+                        // Show context around the error position if available
+                        if let Some(col) = e.column().checked_sub(1) {
+                            let start = col.saturating_sub(100);
+                            let end = (col + 100).min(response_text.len());
+                            eprintln!(
+                                "Context around error (col {}):\n...{}...",
+                                col,
+                                &response_text[start..end]
+                            );
+                        }
+                        // Save full response to file for inspection
+                        if let Ok(()) =
+                            std::fs::write("/tmp/sc-cli-debug-response.json", &response_text)
+                        {
+                            eprintln!("Full response saved to /tmp/sc-cli-debug-response.json");
+                        }
+                    }
+                    return Err(e).context("Failed to parse search response");
+                }
+            };
 
             let stories_count = search_response.stories.data.len();
             if self.debug {
@@ -548,8 +572,32 @@ impl ShortcutApi for ShortcutClient {
             );
         }
 
-        let search_response: super::SearchResponse =
-            serde_json::from_str(&response_text).context("Failed to parse search response")?;
+        let search_response: super::SearchResponse = match serde_json::from_str(&response_text) {
+            Ok(resp) => resp,
+            Err(e) => {
+                if self.debug {
+                    eprintln!("JSON parsing error: {e}");
+                    eprintln!("Full response length: {} chars", response_text.len());
+                    // Show context around the error position if available
+                    if let Some(col) = e.column().checked_sub(1) {
+                        let start = col.saturating_sub(100);
+                        let end = (col + 100).min(response_text.len());
+                        eprintln!(
+                            "Context around error (col {}):\n...{}...",
+                            col,
+                            &response_text[start..end]
+                        );
+                    }
+                    // Save full response to file for inspection
+                    if let Ok(()) =
+                        std::fs::write("/tmp/sc-cli-debug-response.json", &response_text)
+                    {
+                        eprintln!("Full response saved to /tmp/sc-cli-debug-response.json");
+                    }
+                }
+                return Err(e).context("Failed to parse search response");
+            }
+        };
 
         let stories_count = search_response.stories.data.len();
         if self.debug {

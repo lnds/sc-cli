@@ -1,5 +1,14 @@
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// Deserializes a string field that may be null, converting null to empty string
+fn deserialize_null_string<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
 
 pub mod client;
 
@@ -44,7 +53,9 @@ pub struct Story {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Branch {
     pub id: i64,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub name: String,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub url: String,
     #[serde(default)]
     pub repository_id: Option<i64>,
@@ -57,7 +68,9 @@ pub struct Branch {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PullRequest {
     pub id: i64,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub title: String,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub url: String,
     #[serde(default)]
     pub number: Option<i64>,
@@ -76,8 +89,11 @@ pub struct PullRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Commit {
     pub id: i64,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub hash: String,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub message: String,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub url: String,
     #[serde(default)]
     pub author_id: Option<String>,
@@ -88,10 +104,13 @@ pub struct Commit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comment {
     pub id: i64,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub text: String,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub author_id: String,
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub created_at: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_string")]
     pub updated_at: String,
 }
 

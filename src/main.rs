@@ -9,6 +9,7 @@ use anyhow::{Context, Result};
 use api::{ShortcutApi, client::ShortcutClient};
 use clap::Parser;
 use config::Config;
+use dialoguer::Input;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
@@ -209,6 +210,23 @@ enum Command {
         #[arg(short, long)]
         token: Option<String>,
     },
+    /// Create a git branch for a story
+    Branch {
+        /// Story ID to create branch for (e.g., 42 or sc-42)
+        story_id: String,
+
+        /// Use the default branch name without prompting
+        #[arg(long)]
+        default: bool,
+
+        /// Create a worktree instead of a branch (for bare repositories)
+        #[arg(long)]
+        worktree: bool,
+
+        /// Shortcut API token (optional if using workspace)
+        #[arg(long)]
+        token: Option<String>,
+    },
     /// Display the version of sc-cli
     Version,
 }
@@ -275,6 +293,12 @@ fn main() -> Result<()> {
             message,
             token,
         }) => handle_comment_command(args.workspace, token, story_id, message, args.debug),
+        Some(Command::Branch {
+            story_id,
+            default,
+            worktree,
+            token,
+        }) => handle_branch_command(args.workspace, token, story_id, default, worktree, args.debug),
         Some(Command::Version) => handle_version_command(),
         None => {
             // Default to view command when no subcommand is specified
@@ -739,6 +763,157 @@ fn handle_comment_command(
         .context("Failed to add comment")?;
 
     println!("\n✅ Comment added successfully!");
+    println!("  View story: {}", story.app_url);
+
+    Ok(())
+}
+
+fn handle_branch_command(
+    workspace: Option<String>,
+    token: Option<String>,
+    story_id_str: String,
+    use_default: bool,
+    use_worktree: bool,
+    debug: bool,
+) -> Result<()> {
+    // Get token from args or config
+    let token = if let Some(workspace_name) = workspace {
+        // Use explicitly specified workspace
+        let (config, _created) =
+            Config::load_or_create(&workspace_name).context("Failed to load or create config")?;
+        let ws = config
+            .get_workspace(&workspace_name)
+            .context(format!("Failed to get workspace '{workspace_name}'"))?;
+        ws.api_key.clone()
+    } else if token.is_none() {
+        // No args provided, try to use default workspace
+        match Config::load() {
+            Ok(config) => {
+                if let Some(default_workspace_name) = config.get_default_workspace() {
+                    let ws = config
+                        .get_workspace(&default_workspace_name)
+                        .context(format!(
+                            "Failed to get default workspace '{default_workspace_name}'"
+                        ))?;
+                    ws.api_key.clone()
+                } else {
+                    anyhow::bail!(
+                        "No default workspace configured. Use --workspace to specify one or provide --token"
+                    );
+                }
+            }
+            Err(_) => {
+                anyhow::bail!(
+                    "No configuration file found. Use --workspace to create one or provide --token"
+                );
+            }
+        }
+    } else {
+        // Use command line arguments
+        token.ok_or_else(|| anyhow::anyhow!("Either --token or --workspace must be provided"))?
+    };
+
+    let client = ShortcutClient::new(token, debug).context("Failed to create Shortcut client")?;
+
+    // Parse story ID (handle both "42" and "sc-42" formats)
+    let story_id: i64 = story_id_str
+        .trim_start_matches("sc-")
+        .trim_start_matches("SC-")
+        .parse()
+        .context(format!("Invalid story ID: {story_id_str}"))?;
+
+    // Fetch the story to get the suggested branch name
+    let story = client
+        .get_story(story_id)
+        .context(format!("Failed to fetch story {story_id}"))?;
+
+    if debug {
+        eprintln!("Fetched story: {} - {}", story.id, story.name);
+    }
+
+    // Generate the suggested branch name
+    let suggested_branch = story.formatted_vcs_branch_name.clone().unwrap_or_else(|| {
+        format!(
+            "sc-{}-{}",
+            story.id,
+            story
+                .name
+                .to_lowercase()
+                .chars()
+                .map(|c| if c.is_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+                .split('-')
+                .filter(|s| !s.is_empty())
+                .take(5)
+                .collect::<Vec<_>>()
+                .join("-")
+        )
+    });
+
+    // Determine the branch name to use
+    let branch_name = if use_default {
+        println!("Using default branch name: {}", suggested_branch);
+        suggested_branch
+    } else {
+        Input::new()
+            .with_prompt("Branch name")
+            .with_initial_text(&suggested_branch)
+            .interact_text()
+            .context("Failed to read branch name")?
+    };
+
+    // Detect git context
+    let git_context = git::GitContext::detect().context("Failed to detect git context")?;
+
+    if !git_context.is_git_repo() {
+        anyhow::bail!("Not a git repository. Please run this command from within a git repository.");
+    }
+
+    // Determine operation type
+    let should_use_worktree = use_worktree || git_context.is_bare_repo();
+
+    if should_use_worktree && !use_worktree && git_context.is_bare_repo() {
+        println!("Detected bare repository, using worktree mode.");
+    }
+
+    // Build the request
+    let request = git::operations::GitBranchRequest {
+        branch_name: branch_name.clone(),
+        worktree_path: git::generate_worktree_path(&branch_name),
+        operation: if should_use_worktree {
+            git::operations::GitOperation::CreateWorktree
+        } else {
+            git::operations::GitOperation::CreateBranch
+        },
+        story_id,
+    };
+
+    // Execute the git operation
+    let result = git::operations::execute_git_operation(&request);
+
+    if result.success {
+        println!("\n✅ {}", result.message);
+
+        // Move story to In Progress
+        let workflows = client
+            .get_workflows()
+            .context("Failed to fetch workflows")?;
+
+        if let Some(_updated_story) =
+            git::operations::move_story_to_in_progress(&client, story_id, &workflows, debug)
+        {
+            println!("📋 Story moved to In Progress");
+        }
+
+        if let Some(worktree_path) = result.worktree_path {
+            println!("\n📁 Worktree created at: {}", worktree_path);
+            println!("   Run: cd {}", worktree_path);
+        }
+    } else {
+        println!("\n❌ {}", result.message);
+        return Err(anyhow::anyhow!(result.message));
+    }
+
     println!("  View story: {}", story.app_url);
 
     Ok(())

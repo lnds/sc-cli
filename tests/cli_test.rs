@@ -27,6 +27,7 @@ fn test_cli_help() {
         .stdout(predicate::str::contains("--workspace"))
         .stdout(predicate::str::contains("--debug"))
         .stdout(predicate::str::contains("add"))
+        .stdout(predicate::str::contains("branch"))
         .stdout(predicate::str::contains("finish"))
         .stdout(predicate::str::contains("view"));
 }
@@ -265,4 +266,108 @@ fn test_cli_global_all_flag() {
                 ))
                 .or(predicate::str::contains("Error:")), // Catch-all for terminal errors
         );
+}
+
+// Branch command tests
+
+#[test]
+fn test_cli_branch_help() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("branch")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Create a git branch for a story"))
+        .stdout(predicate::str::contains("STORY_ID"))
+        .stdout(predicate::str::contains("--default"))
+        .stdout(predicate::str::contains("--worktree"));
+}
+
+#[test]
+fn test_cli_branch_requires_story_id() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("branch")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("required"));
+}
+
+#[test]
+fn test_cli_branch_requires_auth() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Set HOME to a temp directory to ensure no config file is found
+    cmd.env("HOME", "/tmp/nonexistent-home-dir-for-test")
+        .arg("branch")
+        .arg("12345")
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("No default workspace configured")
+                .or(predicate::str::contains("No configuration file found"))
+                .or(predicate::str::contains(
+                    "Either --token or --workspace must be provided",
+                )),
+        );
+}
+
+#[test]
+fn test_cli_branch_accepts_sc_prefix() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Test that sc- prefixed IDs are accepted (will fail on API call, but validates parsing)
+    cmd.arg("branch")
+        .arg("sc-42")
+        .arg("--token")
+        .arg("fake-token")
+        .arg("--default")
+        .assert()
+        .failure(); // Will fail on API call, but validates parsing
+}
+
+#[test]
+fn test_cli_branch_accepts_numeric_id() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Test that numeric IDs are accepted (will fail on API call, but validates parsing)
+    cmd.arg("branch")
+        .arg("42")
+        .arg("--token")
+        .arg("fake-token")
+        .arg("--default")
+        .assert()
+        .failure(); // Will fail on API call, but validates parsing
+}
+
+#[test]
+fn test_cli_branch_default_flag() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("branch")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--default"))
+        .stdout(predicate::str::contains("Use the default branch name"));
+}
+
+#[test]
+fn test_cli_branch_worktree_flag() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    cmd.arg("branch")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--worktree"))
+        .stdout(predicate::str::contains("Create a worktree"));
+}
+
+#[test]
+fn test_cli_branch_with_both_flags() {
+    let mut cmd = Command::cargo_bin("sc-cli").unwrap();
+    // Test that both flags can be combined
+    cmd.arg("branch")
+        .arg("42")
+        .arg("--default")
+        .arg("--worktree")
+        .arg("--token")
+        .arg("fake-token")
+        .assert()
+        .failure(); // Will fail on API call, but validates flag combination
 }

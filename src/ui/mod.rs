@@ -1568,6 +1568,12 @@ impl App {
                     self.show_help_popup = true;
                     self.help_selected_index = 0;
                 }
+                KeyCode::Char('u') => {
+                    // Open story URL in browser
+                    if let Some(story) = self.get_selected_story() {
+                        let _ = open::that(&story.app_url);
+                    }
+                }
                 KeyCode::Char('g') => {
                     // Create git branch for selected story
                     if self.git_context.is_git_repo()
@@ -3426,6 +3432,7 @@ fn draw_help_popup(frame: &mut Frame, app: &App) {
             vec![
                 ("Space", "Move story to another state"),
                 ("o", "Take ownership of story"),
+                ("u", "Open story URL in browser"),
                 ("e", "Edit story"),
                 ("a", "Add new story"),
                 ("E", "Create new epic"),

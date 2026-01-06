@@ -257,6 +257,29 @@ pub enum GitResultOption {
     ExitAndChange, // Only for successful worktree creation
 }
 
+impl Default for GitBranchPopupState {
+    fn default() -> Self {
+        let mut branch_name_textarea = TextArea::default();
+        branch_name_textarea.set_cursor_line_style(Style::default());
+        branch_name_textarea
+            .set_block(Block::default().borders(Borders::ALL).title("Branch Name"));
+
+        let mut worktree_path_textarea = TextArea::default();
+        worktree_path_textarea.set_cursor_line_style(Style::default());
+        worktree_path_textarea
+            .set_block(Block::default().borders(Borders::ALL).title("Worktree Path"));
+
+        Self {
+            branch_name_textarea,
+            worktree_path_textarea,
+            selected_option: GitBranchOption::CreateBranch,
+            story_id: 0,
+            editing_branch_name: false,
+            editing_worktree_path: false,
+        }
+    }
+}
+
 impl Default for CreatePopupState {
     fn default() -> Self {
         let mut name_textarea = TextArea::default();

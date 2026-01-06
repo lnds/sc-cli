@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use std::process::Command;
 
+pub mod operations;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum GitRepoType {
     Normal,
@@ -154,6 +156,7 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    #[allow(dead_code)]
     fn setup_test_repo(bare: bool) -> Result<TempDir> {
         let temp_dir = TempDir::new()?;
         let mut cmd = Command::new("git");

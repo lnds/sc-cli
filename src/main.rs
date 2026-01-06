@@ -1336,148 +1336,58 @@ fn run_app(
 
         // Check if we need to handle git branch creation
         if app.git_branch_requested {
-            let branch_name = app.git_popup_state.branch_name_textarea.lines().join("");
-            let worktree_path = app.git_popup_state.worktree_path_textarea.lines().join("");
             let selected_option = app.git_popup_state.selected_option.clone();
-            let story_id = app.git_popup_state.story_id;
 
-            let mut result_message = String::new();
-            let mut operation_success = false;
-            let mut should_move_to_progress = false;
-            let operation_type = match selected_option {
-                ui::GitBranchOption::CreateBranch => ui::GitOperationType::CreateBranch,
-                ui::GitBranchOption::CreateWorktree => ui::GitOperationType::CreateWorktree,
-                ui::GitBranchOption::Cancel => {
-                    // Reset git request state and return early
-                    app.git_branch_requested = false;
-                    app.git_popup_state = ui::GitBranchPopupState {
-                        branch_name_textarea: {
-                            let mut textarea = tui_textarea::TextArea::default();
-                            textarea.set_cursor_line_style(ratatui::style::Style::default());
-                            textarea.set_block(
-                                ratatui::widgets::Block::default()
-                                    .borders(ratatui::widgets::Borders::ALL)
-                                    .title("Branch Name"),
-                            );
-                            textarea
-                        },
-                        worktree_path_textarea: {
-                            let mut textarea = tui_textarea::TextArea::default();
-                            textarea.set_cursor_line_style(ratatui::style::Style::default());
-                            textarea.set_block(
-                                ratatui::widgets::Block::default()
-                                    .borders(ratatui::widgets::Borders::ALL)
-                                    .title("Worktree Path"),
-                            );
-                            textarea
-                        },
-                        selected_option: ui::GitBranchOption::CreateBranch,
-                        story_id: 0,
-                        editing_branch_name: false,
-                        editing_worktree_path: false,
-                    };
-                    continue;
-                }
+            // Handle cancel early
+            if selected_option == ui::GitBranchOption::Cancel {
+                app.git_branch_requested = false;
+                app.git_popup_state = ui::GitBranchPopupState::default();
+                continue;
+            }
+
+            // Build the git operation request
+            let request = git::operations::GitBranchRequest {
+                branch_name: app.git_popup_state.branch_name_textarea.lines().join(""),
+                worktree_path: app.git_popup_state.worktree_path_textarea.lines().join(""),
+                operation: match selected_option {
+                    ui::GitBranchOption::CreateBranch => git::operations::GitOperation::CreateBranch,
+                    ui::GitBranchOption::CreateWorktree => {
+                        git::operations::GitOperation::CreateWorktree
+                    }
+                    ui::GitBranchOption::Cancel => unreachable!(),
+                },
+                story_id: app.git_popup_state.story_id,
             };
 
-            match selected_option {
-                ui::GitBranchOption::CreateBranch => {
-                    // Check if branch already exists
-                    match git::branch_exists(&branch_name) {
-                        Ok(true) => {
-                            result_message = format!("Branch '{branch_name}' already exists");
-                        }
-                        Ok(false) => {
-                            // Create the branch
-                            match git::create_branch(&branch_name) {
-                                Ok(()) => {
-                                    result_message = format!(
-                                        "Successfully created and switched to branch '{branch_name}'"
-                                    );
-                                    operation_success = true;
-                                    should_move_to_progress = true;
-                                }
-                                Err(e) => {
-                                    result_message =
-                                        format!("Failed to create branch '{branch_name}': {e}");
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            result_message = format!("Failed to check if branch exists: {e}");
-                        }
-                    }
-                }
-                ui::GitBranchOption::CreateWorktree => {
-                    // Create worktree for bare repository
-                    match git::create_worktree(&branch_name, &worktree_path) {
-                        Ok(()) => {
-                            result_message = format!(
-                                "Successfully created worktree '{branch_name}' at '{worktree_path}'"
-                            );
-                            operation_success = true;
-                            should_move_to_progress = true;
-                        }
-                        Err(e) => {
-                            result_message = format!("Failed to create worktree: {e}");
-                        }
-                    }
-                }
-                ui::GitBranchOption::Cancel => {
-                    // Already handled above
-                }
-            }
+            // Execute the git operation
+            let result = git::operations::execute_git_operation(&request);
 
             // Move story to In Progress if operation was successful
-            if should_move_to_progress && story_id > 0 {
-                // Find an "In Progress" or "started" state
-                let in_progress_state_id = app
-                    .workflows
-                    .iter()
-                    .flat_map(|w| &w.states)
-                    .find(|state| {
-                        state.state_type == "started"
-                            || state.name.to_lowercase().contains("progress")
-                            || state.name.to_lowercase().contains("doing")
-                    })
-                    .map(|state| state.id);
-
-                if let Some(target_state_id) = in_progress_state_id {
-                    // Update the story state
-                    match client.update_story_state(story_id, target_state_id) {
-                        Ok(updated_story) => {
-                            if debug {
-                                eprintln!("✅ Moved story {story_id} to In Progress state");
-                            }
-                            // Update the app state with the updated story
-                            update_story_state(&mut app, story_id, updated_story);
-                        }
-                        Err(e) => {
-                            if debug {
-                                eprintln!("⚠️ Failed to move story to In Progress: {e}");
-                            }
-                        }
-                    }
-                }
+            if result.success
+                && let Some(updated_story) = git::operations::move_story_to_in_progress(
+                    &client,
+                    result.story_id,
+                    &app.workflows,
+                    debug,
+                )
+            {
+                update_story_state(&mut app, result.story_id, updated_story);
             }
 
-            // Show result popup
+            // Convert to UI result state
+            let operation_type = match result.operation {
+                git::operations::GitOperation::CreateBranch => ui::GitOperationType::CreateBranch,
+                git::operations::GitOperation::CreateWorktree => ui::GitOperationType::CreateWorktree,
+            };
+
             app.git_result_state = ui::GitResultState {
-                success: operation_success,
+                success: result.success,
                 operation_type,
-                message: result_message,
-                branch_name: branch_name.clone(),
-                worktree_path: if matches!(selected_option, ui::GitBranchOption::CreateWorktree)
-                    && operation_success
-                {
-                    Some(worktree_path)
-                } else {
-                    None
-                },
-                story_id,
-                selected_option: if matches!(selected_option, ui::GitBranchOption::CreateWorktree)
-                    && operation_success
-                {
+                message: result.message,
+                branch_name: result.branch_name,
+                worktree_path: result.worktree_path.clone(),
+                story_id: result.story_id,
+                selected_option: if result.worktree_path.is_some() && result.success {
                     ui::GitResultOption::ExitAndChange
                 } else {
                     ui::GitResultOption::Continue
@@ -1487,32 +1397,7 @@ fn run_app(
 
             // Reset git request state
             app.git_branch_requested = false;
-            app.git_popup_state = ui::GitBranchPopupState {
-                branch_name_textarea: {
-                    let mut textarea = tui_textarea::TextArea::default();
-                    textarea.set_cursor_line_style(ratatui::style::Style::default());
-                    textarea.set_block(
-                        ratatui::widgets::Block::default()
-                            .borders(ratatui::widgets::Borders::ALL)
-                            .title("Branch Name"),
-                    );
-                    textarea
-                },
-                worktree_path_textarea: {
-                    let mut textarea = tui_textarea::TextArea::default();
-                    textarea.set_cursor_line_style(ratatui::style::Style::default());
-                    textarea.set_block(
-                        ratatui::widgets::Block::default()
-                            .borders(ratatui::widgets::Borders::ALL)
-                            .title("Worktree Path"),
-                    );
-                    textarea
-                },
-                selected_option: ui::GitBranchOption::CreateBranch,
-                story_id: 0,
-                editing_branch_name: false,
-                editing_worktree_path: false,
-            };
+            app.git_popup_state = ui::GitBranchPopupState::default();
         }
 
         // Check if we need to refresh all stories

@@ -1,6 +1,6 @@
 [package]
 name = "sc-cli"
-version = "0.3.0"
+version = "0.3.2"
 edition = "2024"
 authors = ["Eduardo Diaz"]
 description = "CLI and TUI client for Shortcut stories"

@@ -766,15 +766,14 @@ impl App {
                 let relative_row = mouse.row - area.y;
 
                 // Check if we clicked on any URL
+                // Add 1 to start_col/end_col to account for the left border
                 for clickable_url in &self.clickable_urls {
                     if clickable_url.row == relative_row
-                        && mouse.column >= area.x + clickable_url.start_col
-                        && mouse.column <= area.x + clickable_url.end_col {
+                        && mouse.column >= area.x + 1 + clickable_url.start_col
+                        && mouse.column <= area.x + 1 + clickable_url.end_col {
 
                         // Open the URL in the default browser
-                        if let Err(e) = open::that(&clickable_url.url) {
-                            eprintln!("Failed to open URL: {}", e);
-                        }
+                        let _ = open::that(&clickable_url.url);
                         break;
                     }
                 }
